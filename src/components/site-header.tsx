@@ -35,6 +35,7 @@ export function SiteHeader() {
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
     queryFn: () => listCategories(),
+    enabled: typeof window !== "undefined",
     staleTime: 5 * 60 * 1000,
   });
 
