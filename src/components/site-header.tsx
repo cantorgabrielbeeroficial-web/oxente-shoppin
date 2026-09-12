@@ -24,7 +24,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import logoHeader from "@/assets/oxente-logo-header.png.asset.json";
 
 export function SiteHeader() {
   const [term, setTerm] = useState("");
@@ -51,7 +50,7 @@ export function SiteHeader() {
     >
       <div className="mx-auto flex max-w-7xl flex-nowrap items-center gap-2 px-3 py-2 text-primary sm:flex-wrap sm:gap-3 sm:px-4 sm:py-3">
         <Link to="/" className="hidden shrink-0 items-center sm:flex">
-          <img src={logoHeader.url} alt="Oxente" className="h-20 w-auto" />
+          <img src="/logo-oxente.png" alt="Oxente" className="h-20 w-auto" />
         </Link>
 
         <form

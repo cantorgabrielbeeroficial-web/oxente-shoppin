@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import sellerBannerAsset from "@/assets/oxente-banner-seller.png.asset.json";
 
 const DESKTOP_BANNER_ITEMS = [
   {
@@ -22,7 +21,7 @@ const DESKTOP_BANNER_ITEMS = [
   {
     id: "venda-oxente",
     title: "Venda na Oxente",
-    image: sellerBannerAsset.url,
+    image: "/Banner-do-inicio-topo-01.png",
     link: "/vendedor",
   },
 ];

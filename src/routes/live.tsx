@@ -30,15 +30,13 @@ import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/format";
 import { useAuthUser } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
-import bannerCreative from "@/assets/banner-creative.jpg.asset.json";
-import fullBanner from "@/assets/oxente-banner-full.png.asset.json";
 
 const TABS = ["Vídeos", "Lives", "Para você", "Seguindo"] as const;
 const CAPTURE_MODES = ["POST", "STORIES", "INSTANTS", "REELS", "LIVE"] as const;
 const FEED = [
   {
     id: "1",
-    cover: bannerCreative.url,
+    cover: "/Banner-do-inicio-topo-01.png",
     store: "Ateliê do Sertão",
     storeSlug: "atelie-do-sertao",
     caption: "Oxente! Rede de descanso feita no tear, direto do Cariri 🧵",
@@ -50,7 +48,7 @@ const FEED = [
   },
   {
     id: "2",
-    cover: fullBanner.url,
+    cover: "/Banner-do-inicio-topo-01.png",
     videoUrl: "/video-teste.mp4",
     store: "Raquel Santos",
     storeSlug: "raquel-santos",

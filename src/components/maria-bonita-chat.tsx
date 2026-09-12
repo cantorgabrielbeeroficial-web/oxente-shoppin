@@ -8,8 +8,6 @@ import { Card } from "@/components/ui/card";
 import { MessageCircle, Send, X, Minus, GripHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthUser } from "@/hooks/use-auth";
-import logoHeader from "@/assets/oxente-logo-header.png.asset.json";
-import mariaAvatar from "@/assets/maria-bonita-avatar.jpg.asset.json";
 
 interface Message {
   id: string;
@@ -202,7 +200,7 @@ export function MariaBonitaChat() {
           <div className="flex items-center justify-between bg-brand-orange-soft px-4 py-3 cursor-move active:cursor-grabbing select-none pointer-events-auto">
             <div className="flex items-center gap-2">
               <Avatar className="h-10 w-10 border-2 border-primary">
-                <AvatarImage src={mariaAvatar.url} alt="Maria Bonita" className="object-cover" />
+                <AvatarImage src="/logo-oficial.png" alt="Maria Bonita" className="object-cover" />
                 <AvatarFallback className="bg-primary text-white">MB</AvatarFallback>
               </Avatar>
               <div>
@@ -324,7 +322,7 @@ export function MariaBonitaChat() {
           <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-green-500 border-2 border-white z-20 pointer-events-none"></div>
           <div className="h-full w-full rounded-full flex items-center justify-center relative overflow-hidden pointer-events-none">
             <Avatar className="h-full w-full border-2 border-white/20">
-              <AvatarImage src={mariaAvatar.url} alt="Maria Bonita" className="object-cover" />
+              <AvatarImage src="/logo-oficial.png" alt="Maria Bonita" className="object-cover" />
               <AvatarFallback className="bg-primary text-white">
                 <MessageCircle className="h-8 w-8 text-white" />
               </AvatarFallback>
