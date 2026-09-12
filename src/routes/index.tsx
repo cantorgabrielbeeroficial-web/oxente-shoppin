@@ -43,15 +43,15 @@ const categoriesQuery = queryOptions({
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Bodega Achados — Oxente" },
+      { title: "Oxente — Marketplace" },
       {
         name: "description",
-        content: "Os melhores achados da Bodega, com o jeitinho nordestino.",
+        content: "Marketplace nordestino com lojas, produtos e achados especiais.",
       },
-      { property: "og:title", content: "Bodega Achados — Oxente" },
+      { property: "og:title", content: "Oxente — Marketplace" },
       {
         property: "og:description",
-        content: "Achados selecionados da Bodega para comprar no Oxente.",
+        content: "Lojas e produtos selecionados para comprar no Oxente.",
       },
     ],
   }),
