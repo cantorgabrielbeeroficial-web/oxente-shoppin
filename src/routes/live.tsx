@@ -29,7 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/format";
 import { useAuthUser } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
+import { hasSupabaseConfig, supabase } from "@/integrations/supabase/client";
 
 const TABS = ["Vídeos", "Lives", "Para você", "Seguindo"] as const;
 const CAPTURE_MODES = ["POST", "STORIES", "INSTANTS", "REELS", "LIVE"] as const;
@@ -140,7 +140,7 @@ function LivePage() {
   );
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !hasSupabaseConfig()) {
       setCurrentUserProfile({
         avatarUrl: "",
         fullName: "Raquel Santos",
@@ -207,6 +207,8 @@ function LivePage() {
   }, [showAnnouncementDetails]);
 
   useEffect(() => {
+    if (!hasSupabaseConfig()) return;
+
     let active = true;
     Promise.all([
       supabase.from("video_likes").select("content_id, user_id"),
@@ -245,6 +247,8 @@ function LivePage() {
   }, [user]);
 
   useEffect(() => {
+    if (!hasSupabaseConfig()) return;
+
     const channel = supabase
       .channel("live-comments")
       .on(

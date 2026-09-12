@@ -3,10 +3,14 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { BadgeCheck, Store } from "lucide-react";
 import { listProducts } from "@/lib/catalog.functions";
 import { ProductGrid } from "@/components/product-card";
+import { hasSupabaseConfig } from "@/integrations/supabase/client";
 
 const officialQuery = queryOptions({
   queryKey: ["products", "oficiais"],
-  queryFn: () => listProducts({ data: { storeKind: "interligada", sort: "recentes", limit: 20 } }),
+  queryFn: () =>
+    hasSupabaseConfig()
+      ? listProducts({ data: { storeKind: "interligada", sort: "recentes", limit: 20 } })
+      : Promise.resolve([]),
 });
 
 export const Route = createFileRoute("/oficiais")({
