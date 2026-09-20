@@ -32,6 +32,7 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string>("");
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const [useCredits, setUseCredits] = useState(true);
   const [form, setForm] = useState({
     label: "Casa",
@@ -66,7 +67,8 @@ function CheckoutPage() {
   });
 
   const orderMutation = useMutation({
-    mutationFn: (addressId: string) => order({ data: { addressId, creditsToUse: creditsApplied } }),
+    mutationFn: (addressId: string) =>
+      order({ data: { addressId, creditsToUse: creditsApplied, idempotencyKey } }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       queryClient.invalidateQueries({ queryKey: ["cart-count"] });
@@ -77,6 +79,7 @@ function CheckoutPage() {
           ? `Pedido confirmado! Você ganhou ${formatBRL(result.cashbackEarned)} em Créditos Oxente.`
           : "Pedido realizado com sucesso!",
       );
+      setIdempotencyKey(crypto.randomUUID());
       navigate({ to: "/pedidos" });
     },
     onError: (error: Error) => toast.error(error.message || "Não foi possível concluir o pedido."),

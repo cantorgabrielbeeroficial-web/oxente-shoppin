@@ -2,12 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Address, CartItem, Order, SessionInfo } from "./types";
-import { MAX_CREDIT_SHARE, PLATFORM_FEE_RATE, cashbackRate, tierForSpend } from "./loyalty";
-
-function money(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 const PRODUCT_SELECT =
   "id, name, price, stock, image_url, created_at, category_id, store:stores(id, name, slug, logo_url, store_kind)";
 
@@ -196,7 +190,11 @@ export const placeOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
-      .object({ addressId: z.string().uuid(), creditsToUse: z.number().min(0).default(0) })
+      .object({
+        addressId: z.string().uuid(),
+        creditsToUse: z.number().min(0).default(0),
+        idempotencyKey: z.string().uuid().optional(),
+      })
       .parse(input),
   )
   .handler(
@@ -240,133 +238,23 @@ export const placeOrder = createServerFn({ method: "POST" })
       ).filter((row) => row.product !== null);
 
       if (items.length === 0) throw new Error("Seu carrinho está vazio.");
+      const { data: result, error } = await supabase.rpc("place_order_transactional", {
+        p_items: items.map((item) => ({
+          product_id: item.product!.id,
+          quantity: item.quantity,
+        })),
+        p_shipping_address: address,
+        p_idempotency_key: data.idempotencyKey ?? crypto.randomUUID(),
+        p_credits_to_use: data.creditsToUse,
+      });
+      if (error) throw new Error(`Falha ao processar o pedido: ${error.message}`);
 
-      for (const item of items) {
-        if (item.product!.stock < item.quantity) {
-          throw new Error(`Estoque insuficiente para "${item.product!.name}".`);
-        }
-      }
-
-      const byStore = new Map<string, typeof items>();
-      for (const item of items) {
-        const storeId = item.product!.store_id;
-        byStore.set(storeId, [...(byStore.get(storeId) ?? []), item]);
-      }
-
-      const addressLine = [
-        `${address.street}, ${address.number}${address.complement ? ` - ${address.complement}` : ""}`,
-        `${address.district}, ${address.city} - ${address.state}`,
-        `CEP ${address.zip_code}`,
-      ].join(" | ");
-
-      const grandTotal = money(
-        items.reduce((sum, item) => sum + Number(item.product!.price) * item.quantity, 0),
-      );
-
-      // Créditos Oxente: limitados ao saldo real e a uma parte do pedido.
-      const { data: account } = await supabase
-        .from("loyalty_accounts")
-        .select("balance, total_spent, tier")
-        .eq("user_id", userId)
-        .maybeSingle();
-      const balance = Number(account?.balance ?? 0);
-      const creditsUsed = money(
-        Math.max(0, Math.min(data.creditsToUse, balance, grandTotal * MAX_CREDIT_SHARE)),
-      );
-
-      const orderIds: string[] = [];
-      let platformFeeTotal = 0;
-      let sellerNetTotal = 0;
-
-      for (const [storeId, storeItems] of byStore) {
-        const total = money(
-          storeItems.reduce((sum, item) => sum + Number(item.product!.price) * item.quantity, 0),
-        );
-        // Split automático: comissão da plataforma retida, líquido vai para o vendedor.
-        const platformFee = money(total * PLATFORM_FEE_RATE);
-        const sellerNet = money(total - platformFee);
-        const creditsShare = grandTotal > 0 ? money(creditsUsed * (total / grandTotal)) : 0;
-        platformFeeTotal = money(platformFeeTotal + platformFee);
-        sellerNetTotal = money(sellerNetTotal + sellerNet);
-
-        const { data: order, error: orderError } = await supabase
-          .from("orders")
-          .insert({
-            buyer_id: userId,
-            store_id: storeId,
-            total,
-            platform_fee: platformFee,
-            seller_net: sellerNet,
-            credits_applied: creditsShare,
-            shipping_recipient: address.recipient_name,
-            shipping_address: addressLine,
-          })
-          .select("id")
-          .single();
-        if (orderError) throw new Error(orderError.message);
-
-        const { error: payoutError } = await supabase.from("payouts").insert({
-          order_id: order.id,
-          store_id: storeId,
-          gross_amount: total,
-          platform_fee: platformFee,
-          net_amount: sellerNet,
-        });
-        if (payoutError) throw new Error(payoutError.message);
-
-        const { error: itemsError } = await supabase.from("order_items").insert(
-          storeItems.map((item) => ({
-            order_id: order.id,
-            product_id: item.product!.id,
-            product_name: item.product!.name,
-            unit_price: Number(item.product!.price),
-            quantity: item.quantity,
-          })),
-        );
-        if (itemsError) throw new Error(itemsError.message);
-
-        for (const item of storeItems) {
-          await supabase.rpc("decrement_stock", {
-            _product_id: item.product!.id,
-            _quantity: item.quantity,
-          });
-        }
-        orderIds.push(order.id);
-      }
-
-      await supabase.from("cart_items").delete().eq("user_id", userId);
-
-      // Fidelidade: uso de créditos, cashback do nível e progresso do chapéu.
-      const paidAmount = money(grandTotal - creditsUsed);
-      const tier = tierForSpend(Number(account?.total_spent ?? 0) + paidAmount);
-      const cashbackEarned = money(paidAmount * cashbackRate(tier));
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const firstOrderId = orderIds[0] ?? null;
-
-      if (creditsUsed > 0) {
-        await supabaseAdmin.rpc("loyalty_apply_credits", {
-          _user_id: userId,
-          _amount: -creditsUsed,
-          _reason: "Créditos usados na compra",
-          _order_id: firstOrderId as unknown as string,
-        });
-      }
-      await supabaseAdmin.rpc("loyalty_register_spend", { _user_id: userId, _amount: paidAmount });
-      if (cashbackEarned > 0) {
-        await supabaseAdmin.rpc("loyalty_apply_credits", {
-          _user_id: userId,
-          _amount: cashbackEarned,
-          _reason: "Cashback da compra",
-          _order_id: firstOrderId as unknown as string,
-        });
-      }
-
-      return {
-        orderIds,
-        creditsUsed,
-        cashbackEarned,
-        platformFee: platformFeeTotal,
-        sellerNet: sellerNetTotal,
+      return result as {
+        orderIds: string[];
+        creditsUsed: number;
+        cashbackEarned: number;
+        platformFee: number;
+        sellerNet: number;
       };
     },
   );

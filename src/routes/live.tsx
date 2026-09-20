@@ -852,31 +852,41 @@ function LivePage() {
                     <div className="relative z-40 mb-3 w-full overflow-hidden rounded-xl shadow-lg">
                       {showAnnouncementDetails && (
                         <div className="animate-announcement-rise bg-white/95 p-1">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-2">
                             <img
                               src={item.cover}
                               alt={item.product.name}
-                              className="h-8 w-8 shrink-0 rounded-lg object-cover"
+                              className="h-20 w-20 shrink-0 self-center rounded-lg object-cover"
                             />
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-semibold leading-tight text-foreground">
-                                {item.product.name}
-                              </p>
-                              <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-                                <Star className="h-3 w-3 fill-brand-gold text-brand-gold" /> 4,8
-                              </p>
-                              <p className="text-sm font-extrabold text-foreground">
-                                {formatBRL(item.product.price)} no Pix
-                              </p>
+                            <div className="flex min-w-0 flex-1 flex-col gap-1">
+                              <div className="min-w-0">
+                                <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
+                                  {item.product.name}
+                                </p>
+                                <div className="mt-0.5 flex items-center gap-1.5">
+                                  <span className="rounded-sm bg-primary px-1 py-0.5 text-[9px] font-bold text-primary-foreground">
+                                    Oferta
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">Frete grátis</span>
+                                </div>
+                                <div className="mt-0.5 flex items-center gap-1">
+                                  <span className="text-sm font-extrabold text-primary">
+                                    {formatBRL(item.product.price)}
+                                  </span>
+                                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                                    <Star className="h-3 w-3 fill-brand-gold text-brand-gold" /> 4,8
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-bold text-primary-foreground"
+                              >
+                                <ShoppingCart className="h-3.5 w-3.5" />
+                                Comprar com cupom
+                              </button>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg bg-primary px-2 py-1.5 text-[10px] font-bold text-primary-foreground"
-                          >
-                            <ShoppingCart className="h-3.5 w-3.5" />
-                            Comprar com cupom
-                          </button>
                         </div>
                       )}
                       <button

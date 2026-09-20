@@ -662,6 +662,15 @@ export type Database = {
         Args: { _product_id: string; _quantity: number };
         Returns: undefined;
       };
+      place_order_transactional: {
+        Args: {
+          p_credits_to_use?: number;
+          p_idempotency_key: string;
+          p_items: Json;
+          p_shipping_address: Json;
+        };
+        Returns: Json;
+      };
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"];
