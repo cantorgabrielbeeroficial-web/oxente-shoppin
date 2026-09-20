@@ -697,7 +697,7 @@ export type Database = {
       app_role: "admin" | "seller" | "buyer";
       application_status: "pending" | "approved" | "rejected";
       hat_tier: "bronze" | "prata" | "ouro";
-      order_status: "pendente" | "confirmado" | "enviado" | "entregue" | "cancelado";
+      order_status: "pendente" | "confirmado" | "paid" | "enviado" | "entregue" | "cancelado";
       payout_status: "pendente" | "processando" | "repassado" | "cancelado";
     };
     CompositeTypes: {

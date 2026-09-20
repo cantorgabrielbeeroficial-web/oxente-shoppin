@@ -65,7 +65,7 @@ export type CartItem = {
   product: ProductListItem;
 };
 
-export type OrderStatus = "pendente" | "confirmado" | "enviado" | "entregue" | "cancelado";
+export type OrderStatus = "pendente" | "confirmado" | "paid" | "enviado" | "entregue" | "cancelado";
 
 export type OrderItem = {
   id: string;
