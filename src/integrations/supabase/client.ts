@@ -65,8 +65,8 @@ export function hasSupabaseConfig() {
 function getSupabaseUrl() {
   const env = import.meta.env as Record<string, string | undefined>;
   return (
-    env.VITE_SUPABASE_URL ||
-    env.SUPABASE_URL ||
+    env["VITE_SUPABASE_URL"] ||
+    env["SUPABASE_URL"] ||
     (typeof process !== "undefined" && process.env ? process.env["SUPABASE_URL"] : undefined)
   );
 }
@@ -74,9 +74,11 @@ function getSupabaseUrl() {
 function getSupabasePublishableKey() {
   const env = import.meta.env as Record<string, string | undefined>;
   return (
-    env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    env.VITE_SUPABASE_ANON_KEY ||
-    env.SUPABASE_PUBLISHABLE_KEY ||
-    (typeof process !== "undefined" && process.env ? (process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_ANON_KEY"]) : undefined)
+    env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+    env["VITE_SUPABASE_ANON_KEY"] ||
+    env["SUPABASE_PUBLISHABLE_KEY"] ||
+    (typeof process !== "undefined" && process.env
+      ? process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_ANON_KEY"]
+      : undefined)
   );
 }
