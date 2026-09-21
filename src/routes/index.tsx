@@ -29,6 +29,7 @@ import { formatBRL } from "@/lib/format";
 import { BannerCarousel } from "@/components/banner-carousel";
 import { MobileSearchBar } from "@/components/mobile-search-bar";
 import { PromoCarousel } from "@/components/promo-carousel";
+import { ProductGrid } from "@/components/product-card";
 import coinIcon from "@/assets/oxente-coin.png";
 import {
   Dialog,
@@ -110,7 +111,19 @@ function Home() {
   });
   const { data: testProducts = [] } = useQuery({
     queryKey: ["home-test-product"],
-    queryFn: () => listProducts({ data: { search: "Fone de Ouvido Bluetooth Sem Fio", limit: 1 } }),
+    queryFn: () =>
+      listProducts({ data: { search: "Fone de Ouvido Bluetooth Sem Fio", limit: 1 } }),
+    enabled: typeof window !== "undefined",
+  });
+  const { data: officialProducts = [] } = useQuery({
+    queryKey: ["home-products", "interligada"],
+    queryFn: () => listProducts({ data: { storeKind: "interligada", limit: 12 } }),
+    enabled: typeof window !== "undefined",
+  });
+  const { data: bodegaProducts = [] } = useQuery({
+    queryKey: ["home-products", "bodega"],
+    queryFn: () => listProducts({ data: { storeKind: "bodega", limit: 12 } }),
+    enabled: typeof window !== "undefined",
   });
   const testProduct = testProducts[0];
   const buyTestProduct = useMutation({
@@ -216,6 +229,47 @@ function Home() {
               <ShoppingCart className="mr-2 h-4 w-4" />
               {testProduct.stock > 0 ? "Comprar por Pix" : "Esgotado"}
             </Button>
+          </div>
+        </section>
+      )}
+
+      {officialProducts.length > 0 && (
+        <section className="mt-8">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+                Loja oficial
+              </span>
+              <h2 className="mt-1 text-lg font-bold text-foreground">Produtos oficiais</h2>
+            </div>
+            <Link
+              to="/oficiais"
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              Ver todos
+            </Link>
+          </div>
+          <div className="mt-3">
+            <ProductGrid products={officialProducts} />
+          </div>
+        </section>
+      )}
+
+      {bodegaProducts.length > 0 && (
+        <section className="mt-8">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+                Lojas parceiras
+              </span>
+              <h2 className="mt-1 text-lg font-bold text-foreground">Achados das lojas</h2>
+            </div>
+            <Link to="/buscar" className="text-xs font-semibold text-primary hover:underline">
+              Ver todos
+            </Link>
+          </div>
+          <div className="mt-3">
+            <ProductGrid products={bodegaProducts} />
           </div>
         </section>
       )}
