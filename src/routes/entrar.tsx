@@ -116,8 +116,18 @@ function AuthPage() {
   async function handleSignUp(event: React.FormEvent) {
     event.preventDefault();
 
+    if (!hasSupabaseConfig()) {
+      toast.error("O cadastro está temporariamente indisponível. Configure o Supabase no deploy.");
+      return;
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedFullName = fullName.trim();
     const whatsappDigits = whatsapp.replace(/\D/g, "");
+    if (!normalizedFullName) {
+      toast.error("Informe seu nome completo.");
+      return;
+    }
     if (whatsappDigits.length < 10) {
       toast.error("Informe um WhatsApp válido.");
       return;
@@ -133,36 +143,50 @@ function AuthPage() {
 
     setLoading(true);
     const phone = `+55${whatsappDigits}`;
-    const { data, error } = normalizedEmail
-      ? await supabase.auth.signUp({
-          email: normalizedEmail,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { full_name: fullName, whatsapp: whatsappDigits, signup_goal: signupGoal },
-          },
-        })
-      : await supabase.auth.signUp({
-          phone,
-          password,
-          options: {
-            data: { full_name: fullName, whatsapp: whatsappDigits, signup_goal: signupGoal },
-          },
-        });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    if (data.session) {
-      toast.success("Conta criada!");
-      navigate({ to: "/" });
-    } else if (!normalizedEmail) {
-      setVerificationPhone(phone);
-      setVerificationPending(true);
-      toast.success("Enviamos um código de validação para seu celular.");
-    } else {
-      toast.success("Confirme seu e-mail para ativar a conta.");
+    try {
+      const { data, error } = normalizedEmail
+        ? await supabase.auth.signUp({
+            email: normalizedEmail,
+            password,
+            options: {
+              emailRedirectTo: window.location.origin,
+              data: {
+                full_name: normalizedFullName,
+                whatsapp: whatsappDigits,
+                signup_goal: signupGoal,
+              },
+            },
+          })
+        : await supabase.auth.signUp({
+            phone,
+            password,
+            options: {
+              data: {
+                full_name: normalizedFullName,
+                whatsapp: whatsappDigits,
+                signup_goal: signupGoal,
+              },
+            },
+          });
+      setLoading(false);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      if (data.session) {
+        toast.success("Conta criada!");
+        navigate({ to: "/" });
+      } else if (!normalizedEmail) {
+        setVerificationPhone(phone);
+        setVerificationPending(true);
+        toast.success("Enviamos um código de validação para seu celular.");
+      } else {
+        toast.success("Confirme seu e-mail para ativar a conta.");
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error("Erro ao criar conta:", error);
+      toast.error(error instanceof Error ? error.message : "Não foi possível criar sua conta.");
     }
   }
 
