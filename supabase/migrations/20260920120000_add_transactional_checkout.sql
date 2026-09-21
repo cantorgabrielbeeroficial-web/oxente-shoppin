@@ -1,4 +1,4 @@
-CREATE TABLE public.checkout_idempotency (
+CREATE TABLE IF NOT EXISTS public.checkout_idempotency (
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   idempotency_key uuid NOT NULL,
   result jsonb,

@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 const SHORTCUTS = [
   { to: "/pedidos", label: "Meus pedidos", icon: Package },
   { to: "/carrinho", label: "Meu carrinho", icon: ShoppingCart },
-  { to: "/painel", label: "Minha loja", icon: Store },
+  { to: "/vender", label: "Minha loja", icon: Store },
   { to: "/conversas", label: "Conversas", icon: MessageCircle },
 ] as const;
 
