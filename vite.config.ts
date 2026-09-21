@@ -7,10 +7,13 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  build: {
-    chunkSizeWarningLimit: 1000,
-  },
   vite: {
+    build: {
+      chunkSizeWarningLimit: 1000,
+    },
+    resolve: {
+      tsconfigPaths: true,
+    },
     server: {
       host: true,
       port: 8080,

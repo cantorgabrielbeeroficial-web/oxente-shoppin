@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const PAGBANK_ORDERS_URL = "https://api.pagseguro.com/orders";
 
@@ -50,7 +52,7 @@ function amountInCents(amount: number): number {
 }
 
 /** Cria uma cobrança Pix no PagBank. Deve ser chamado somente no servidor. */
-export async function createPagSeguroPixOrder(
+async function createPagSeguroPixOrderRequest(
   input: CreatePagSeguroPixOrderInput,
 ): Promise<PagSeguroPixOrder> {
   const token = process.env["PAGSEGURO_TOKEN"];
@@ -106,7 +108,8 @@ export async function createPagSeguroPixOrder(
     throw new Error("Resposta do PagBank não contém um QR Code Pix válido.");
   }
 
-  const qrCode = parsed.data.qr_codes[0];
+  const qrCode = parsed.data.qr_codes?.[0];
+  if (!qrCode) throw new Error("QR Code não retornado pelo PagSeguro.");
   const qrCodeImageUrl = qrCode.links?.find((link) => link.rel.toUpperCase() === "QRCODE.PNG")?.href;
   if (!qrCodeImageUrl) {
     throw new Error("O PagBank não retornou a imagem do QR Code Pix.");
@@ -118,3 +121,41 @@ export async function createPagSeguroPixOrder(
     qrCodeImageUrl,
   };
 }
+
+const createPagSeguroPixOrderInput = z.object({
+  orderId: z.string().uuid(),
+  customer: z.object({
+    name: z.string().trim().min(2).max(120),
+    email: z.string().email().max(320),
+    taxId: z.string().trim().min(11).max(18).optional(),
+  }),
+});
+
+export const createPagSeguroPixOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => createPagSeguroPixOrderInput.parse(input))
+  .handler(async ({ data, context }): Promise<PagSeguroPixOrder> => {
+    const { data: order, error } = await context.supabase
+      .from("orders")
+      .select("id, total, status")
+      .eq("id", data.orderId)
+      .eq("buyer_id", context.userId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!order) throw new Error("Pedido não encontrado.");
+    if (order.status === "paid") throw new Error("Este pedido já foi pago.");
+    if (order.status !== "pendente") throw new Error("Este pedido não está aguardando pagamento.");
+
+    const customer: PagSeguroCustomer = {
+      name: data.customer.name,
+      email: data.customer.email,
+      ...(data.customer.taxId ? { taxId: data.customer.taxId } : {}),
+    };
+
+    return createPagSeguroPixOrderRequest({
+      orderId: order.id,
+      amount: Number(order.total),
+      customer,
+    });
+  });

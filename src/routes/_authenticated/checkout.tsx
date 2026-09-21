@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { createAddress, listAddresses, listCart, placeOrder } from "@/lib/shop.functions";
+import { createAddress, listAddresses, listCart, listMyOrders, placeOrder } from "@/lib/shop.functions";
+import { createPagSeguroPixOrder } from "@/lib/pagseguro";
 import { formatBRL } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,9 @@ function CheckoutPage() {
   const [selected, setSelected] = useState<string>("");
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const [useCredits, setUseCredits] = useState(true);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [pix, setPix] = useState<{ code: string; qrCodeImageUrl: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [form, setForm] = useState({
     label: "Casa",
     recipient_name: "",
@@ -44,6 +48,8 @@ function CheckoutPage() {
     city: "",
     state: "",
     zip_code: "",
+    email: "",
+    taxId: "",
   });
 
   const { data: cart = [] } = useQuery({ queryKey: ["cart"], queryFn: () => listCart() });
@@ -55,6 +61,7 @@ function CheckoutPage() {
 
   const saveAddress = useServerFn(createAddress);
   const order = useServerFn(placeOrder);
+  const createPix = useServerFn(createPagSeguroPixOrder);
 
   const addressMutation = useMutation({
     mutationFn: () => saveAddress({ data: { ...form, is_default: true } }),
@@ -72,18 +79,53 @@ function CheckoutPage() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       queryClient.invalidateQueries({ queryKey: ["cart-count"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["loyalty"] });
-      toast.success(
-        result.cashbackEarned > 0
-          ? `Pedido confirmado! Você ganhou ${formatBRL(result.cashbackEarned)} em Créditos Oxente.`
-          : "Pedido realizado com sucesso!",
-      );
-      setIdempotencyKey(crypto.randomUUID());
-      navigate({ to: "/pedidos" });
+      const orderId = result.orderIds[0];
+      if (!orderId) {
+        toast.error("O pedido foi criado, mas não recebemos o identificador de pagamento.");
+        return;
+      }
+      setCurrentOrderId(orderId);
+      pixMutation.mutate(orderId);
     },
     onError: (error: Error) => toast.error(error.message || "Não foi possível concluir o pedido."),
   });
+
+  const pixMutation = useMutation({
+    mutationFn: (orderId: string) =>
+      createPix({
+        data: {
+          orderId,
+          customer: {
+            name: form.recipient_name,
+            email: form.email,
+            taxId: form.taxId,
+          },
+        },
+      }),
+    onSuccess: (result) => {
+      setPix({ code: result.code, qrCodeImageUrl: result.qrCodeImageUrl });
+      toast.success("Pix gerado. Escaneie o QR Code para pagar.");
+    },
+    onError: (error: Error) => toast.error(error.message || "Não foi possível gerar o Pix."),
+  });
+
+  const paymentQuery = useQuery({
+    queryKey: ["payment-order", currentOrderId],
+    queryFn: async () => {
+      const orders = await listMyOrders();
+      return orders.find((item) => item.id === currentOrderId) ?? null;
+    },
+    enabled: Boolean(currentOrderId),
+    refetchInterval: 3000,
+  });
+
+  useEffect(() => {
+    if (paymentQuery.data?.status === "paid") {
+      toast.success("Pagamento confirmado! Seu pedido foi recebido.");
+      navigate({ to: "/pedidos" });
+    }
+  }, [navigate, paymentQuery.data?.status]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const maxCredits = Math.min(loyalty?.balance ?? 0, subtotal * MAX_CREDIT_SHARE);
@@ -148,6 +190,8 @@ function CheckoutPage() {
             {(
               [
                 ["recipient_name", "Nome do destinatário", "sm:col-span-2"],
+                ["email", "E-mail para o pagamento", "sm:col-span-2"],
+                ["taxId", "CPF", ""],
                 ["street", "Rua", "sm:col-span-2"],
                 ["number", "Número", ""],
                 ["complement", "Complemento", ""],
@@ -180,6 +224,43 @@ function CheckoutPage() {
             </Button>
           </form>
         </section>
+
+        {pix && (
+          <section className="rounded-lg border border-primary/30 bg-card p-5 text-center">
+            <h2 className="text-lg font-bold text-card-foreground">Pague com Pix</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              O pedido será confirmado automaticamente após o pagamento.
+            </p>
+            <img
+              src={pix.qrCodeImageUrl}
+              alt="QR Code para pagamento Pix"
+              className="mx-auto mt-4 h-56 w-56 rounded-md border border-border p-2"
+            />
+            <Label htmlFor="pix-code" className="mt-4 block text-left">
+              Pix copia e cola
+            </Label>
+            <textarea
+              id="pix-code"
+              readOnly
+              value={pix.code}
+              className="mt-1 min-h-24 w-full resize-none rounded-md border border-input bg-background p-3 text-xs text-foreground"
+            />
+            <Button
+              type="button"
+              className="mt-3 w-full"
+              onClick={async () => {
+                await navigator.clipboard.writeText(pix.code);
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 2000);
+              }}
+            >
+              {copied ? "Copiado!" : "Copiar Código Pix"}
+            </Button>
+            {paymentQuery.isFetching && (
+              <p className="mt-3 text-xs text-muted-foreground">Aguardando confirmação do pagamento...</p>
+            )}
+          </section>
+        )}
       </div>
 
       <aside className="h-fit rounded-lg border border-border bg-card p-5">
@@ -234,18 +315,23 @@ function CheckoutPage() {
         <Button
           className="mt-4 w-full"
           size="lg"
-          disabled={!addressId || orderMutation.isPending}
-          onClick={() => orderMutation.mutate(addressId)}
+          disabled={!addressId || orderMutation.isPending || pixMutation.isPending}
+          onClick={() => {
+            if (!form.email || !form.taxId || !form.recipient_name) {
+              toast.error("Informe nome, e-mail e CPF para gerar o Pix.");
+              return;
+            }
+            orderMutation.mutate(addressId);
+          }}
         >
-          Arroxa o nó e concluir pedido
+          {pixMutation.isPending ? "Gerando Pix..." : "Pagar com Pix"}
         </Button>
         <p className="mt-3 text-center text-xs text-muted-foreground">
           {tier.label}: você receberá {formatBRL(cashbackPreview)} de cashback (
           {Math.round(tier.cashback * 100)}%).
         </p>
         <p className="mt-2 text-center text-xs text-muted-foreground">
-          Pedido de demonstração: o pagamento é dividido automaticamente entre a plataforma e a
-          subconta do vendedor, sem cobrança real.
+          O pagamento é processado pelo PagBank. O status será atualizado após a confirmação.
         </p>
       </aside>
     </div>

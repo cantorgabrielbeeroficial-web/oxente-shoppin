@@ -95,7 +95,7 @@ export const dailyCheckin = createServerFn({ method: "POST" })
 
 export const redeemReferral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ code: z.string().trim().min(4).max(16) }).parse(input),
   )
   .handler(async ({ data, context }): Promise<{ balance: number; reward: number }> => {

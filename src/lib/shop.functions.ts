@@ -86,7 +86,7 @@ export const cartCount = createServerFn({ method: "GET" })
 
 export const addToCart = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({ productId: z.string().uuid(), quantity: z.number().int().min(1).max(20) })
       .parse(input),
@@ -117,7 +117,7 @@ export const addToCart = createServerFn({ method: "POST" })
 
 export const updateCartItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ itemId: z.string().uuid(), quantity: z.number().int().min(0).max(99) }).parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -169,7 +169,7 @@ const addressInput = z.object({
 
 export const createAddress = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => addressInput.parse(input))
+  .validator((input: unknown) => addressInput.parse(input))
   .handler(async ({ data, context }): Promise<Address> => {
     const { supabase, userId } = context;
     if (data.is_default) {
@@ -188,7 +188,7 @@ export const createAddress = createServerFn({ method: "POST" })
 
 export const placeOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         addressId: z.string().uuid(),

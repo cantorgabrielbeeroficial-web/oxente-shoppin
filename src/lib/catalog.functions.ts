@@ -83,7 +83,7 @@ const listProductsInput = z.object({
 });
 
 export const listProducts = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) => listProductsInput.parse(input ?? {}))
+  .validator((input: unknown) => listProductsInput.parse(input ?? {}))
   .handler(async ({ data }): Promise<ProductListItem[]> => {
     const supabase = publicClient();
 
@@ -114,7 +114,7 @@ export const listProducts = createServerFn({ method: "GET" })
   });
 
 export const getProduct = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(
     async ({ data }): Promise<{ product: ProductDetail; related: ProductListItem[] } | null> => {
       const supabase = publicClient();
@@ -154,7 +154,7 @@ export const getProduct = createServerFn({ method: "GET" })
   );
 
 export const getStore = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) => z.object({ slug: z.string().min(1).max(80) }).parse(input))
+  .validator((input: unknown) => z.object({ slug: z.string().min(1).max(80) }).parse(input))
   .handler(async ({ data }): Promise<{ store: Store; products: ProductListItem[] } | null> => {
     const supabase = publicClient();
     const { data: store, error } = await supabase

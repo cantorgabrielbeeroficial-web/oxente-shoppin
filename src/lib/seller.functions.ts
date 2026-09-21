@@ -21,7 +21,7 @@ export const getMyStore = createServerFn({ method: "GET" })
 
 export const createMyStore = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         name: z.string().trim().min(2).max(80),
@@ -50,7 +50,7 @@ export const createMyStore = createServerFn({ method: "POST" })
 
 export const updateMyStore = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         name: z.string().trim().min(2).max(80).optional(),
@@ -121,7 +121,7 @@ const productInput = z.object({
 
 export const upsertMyProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => productInput.parse(input))
+  .validator((input: unknown) => productInput.parse(input))
   .handler(async ({ data, context }): Promise<SellerProduct> => {
     const { supabase, userId } = context;
     const { data: store } = await supabase
@@ -171,7 +171,7 @@ export const upsertMyProduct = createServerFn({ method: "POST" })
 
 export const toggleMyProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ id: z.string().uuid(), active: z.boolean() }).parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -219,7 +219,7 @@ export const listMyStoreOrders = createServerFn({ method: "GET" })
 
 export const deleteMyProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { data: store } = await context.supabase
       .from("stores")
