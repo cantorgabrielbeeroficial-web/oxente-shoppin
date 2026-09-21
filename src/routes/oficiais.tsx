@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { BadgeCheck, Store } from "lucide-react";
 import { listProducts } from "@/lib/catalog.functions";
 import { ProductGrid } from "@/components/product-card";
@@ -28,14 +28,14 @@ export const Route = createFileRoute("/oficiais")({
       },
     ],
   }),
-  loader: ({ context }) => {
-    context.queryClient.ensureQueryData(officialQuery);
-  },
   component: OficiaisPage,
 });
 
 function OficiaisPage() {
-  const { data: products } = useSuspenseQuery(officialQuery);
+  const { data: products = [] } = useQuery({
+    ...officialQuery,
+    enabled: hasSupabaseConfig(),
+  });
   const stores = Array.from(new Map(products.map((p) => [p.store.id, p.store])).values()).slice(
     0,
     8,
