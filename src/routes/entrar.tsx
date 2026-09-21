@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { hasSupabaseConfig, supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,8 @@ function AuthPage() {
   const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
+    if (!hasSupabaseConfig()) return;
+
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
     });
@@ -61,6 +63,10 @@ function AuthPage() {
 
   async function handleSignIn(event: React.FormEvent) {
     event.preventDefault();
+    if (!hasSupabaseConfig()) {
+      toast.error("O login está temporariamente indisponível. Configure o Supabase no deploy.");
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
