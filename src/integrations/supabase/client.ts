@@ -63,11 +63,13 @@ export function hasSupabaseConfig() {
 }
 
 function getSupabaseUrl() {
-  return import.meta.env["VITE_SUPABASE_URL"] || process.env["SUPABASE_URL"];
+  return import.meta.env.VITE_SUPABASE_URL || process.env["SUPABASE_URL"];
 }
 
 function getSupabasePublishableKey() {
-  return import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
+  return (
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env["SUPABASE_PUBLISHABLE_KEY"]
+  );
 }
 
 let _supabase: ReturnType<typeof createSupabaseClient> | undefined;

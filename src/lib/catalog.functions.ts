@@ -8,8 +8,11 @@ const PRODUCT_SELECT =
   "id, name, price, stock, image_url, created_at, category_id, store:stores!inner(id, name, slug, logo_url, active, store_kind)";
 
 function publicClient() {
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
-  return createClient<Database>(process.env["SUPABASE_URL"]!, key, {
+  const url = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
+  const key =
+    process.env["SUPABASE_PUBLISHABLE_KEY"] ?? process.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
+  if (!url || !key) throw new Error("Supabase público não está configurado.");
+  return createClient<Database>(url, key, {
     auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
     global: {
       fetch: (input, init) => {
