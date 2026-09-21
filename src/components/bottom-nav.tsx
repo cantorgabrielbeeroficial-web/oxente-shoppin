@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Home, BadgeCheck, PlaySquare, Bell, User } from "lucide-react";
+import { useAuthUser } from "@/hooks/use-auth";
 
 const TABS = [
   { to: "/", label: "Início", icon: Home },
@@ -10,13 +11,15 @@ const TABS = [
 ] as const;
 
 export function BottomNav() {
+  const { user } = useAuthUser();
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur md:hidden">
       <ul className="mx-auto flex max-w-md items-stretch">
         {TABS.map((tab) => (
           <li key={tab.to} className="flex-1">
             <Link
-              to={tab.to}
+              to={tab.to === "/eu" && !user ? "/entrar" : tab.to}
               activeOptions={{ exact: tab.to === "/" }}
               className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-muted-foreground"
               activeProps={{ className: "text-primary" }}
