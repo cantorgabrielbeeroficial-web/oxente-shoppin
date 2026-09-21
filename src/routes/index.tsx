@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useQuery } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import {
   ShieldCheck,
@@ -19,8 +20,12 @@ import {
   ChevronRight,
   Play,
   Star,
+  ShoppingCart,
 } from "lucide-react";
-import { listCategories } from "@/lib/catalog.functions";
+import { listCategories, listProducts } from "@/lib/catalog.functions";
+import { addToCart } from "@/lib/shop.functions";
+import { useAuthUser } from "@/hooks/use-auth";
+import { formatBRL } from "@/lib/format";
 import { BannerCarousel } from "@/components/banner-carousel";
 import { MobileSearchBar } from "@/components/mobile-search-bar";
 import { PromoCarousel } from "@/components/promo-carousel";
@@ -34,6 +39,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const categoriesQuery = queryOptions({
   queryKey: ["categories"],
@@ -94,9 +100,30 @@ const FAKE_OFFICIAL_PRODUCT = {
 type OfficialOption = keyof typeof FAKE_OFFICIAL_PRODUCT.options;
 
 function Home() {
+  const navigate = Route.useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuthUser();
+  const add = useServerFn(addToCart);
   const { data: categories = [] } = useQuery({
     ...categoriesQuery,
     enabled: typeof window !== "undefined",
+  });
+  const { data: testProducts = [] } = useQuery({
+    queryKey: ["home-test-product"],
+    queryFn: () => listProducts({ data: { search: "Fone de Ouvido Bluetooth Sem Fio", limit: 1 } }),
+  });
+  const testProduct = testProducts[0];
+  const buyTestProduct = useMutation({
+    mutationFn: async () => {
+      if (!testProduct) throw new Error("Produto de teste indisponível.");
+      return add({ data: { productId: testProduct.id, quantity: 1 } });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+      queryClient.invalidateQueries({ queryKey: ["cart-count"] });
+      navigate({ to: "/checkout" });
+    },
+    onError: () => toast.error("Não foi possível preparar o pagamento deste produto."),
   });
   const [officialOpen, setOfficialOpen] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<OfficialOption, string>>({
@@ -159,6 +186,39 @@ function Home() {
       <section className="-mx-4 mt-1 px-4 md:mx-0 md:mt-6 md:px-0">
         <PromoCarousel />
       </section>
+
+      {testProduct && (
+        <section className="mt-6 rounded-xl border-2 border-brand-gold/50 bg-brand-gold-soft p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wide text-brand-gold-foreground">
+                Produto de teste
+              </span>
+              <h2 className="mt-1 text-lg font-bold text-card-foreground">
+                Fone Bluetooth por {formatBRL(testProduct.price)}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Teste o fluxo completo: carrinho, checkout e pagamento Pix.
+              </p>
+            </div>
+            <Button
+              type="button"
+              disabled={testProduct.stock <= 0 || buyTestProduct.isPending}
+              onClick={() => {
+                if (!user) {
+                  toast.info("Entre na sua conta para comprar.");
+                  navigate({ to: "/entrar" });
+                  return;
+                }
+                buyTestProduct.mutate();
+              }}
+            >
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              {testProduct.stock > 0 ? "Comprar por Pix" : "Esgotado"}
+            </Button>
+          </div>
+        </section>
+      )}
 
       <section className="mt-1 hidden gap-2 sm:grid sm:grid-cols-3 sm:gap-3">
         {[
