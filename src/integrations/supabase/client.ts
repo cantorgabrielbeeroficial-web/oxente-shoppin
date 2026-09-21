@@ -63,22 +63,20 @@ export function hasSupabaseConfig() {
 }
 
 function getSupabaseUrl() {
-  return import.meta.env.VITE_SUPABASE_URL || process.env["SUPABASE_URL"];
-}
-
-function getSupabasePublishableKey() {
+  const env = import.meta.env as Record<string, string | undefined>;
   return (
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env["SUPABASE_PUBLISHABLE_KEY"]
+    env.VITE_SUPABASE_URL ||
+    env.SUPABASE_URL ||
+    (typeof process !== "undefined" && process.env ? process.env["SUPABASE_URL"] : undefined)
   );
 }
 
-let _supabase: ReturnType<typeof createSupabaseClient> | undefined;
-
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
-export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>, {
-  get(_, prop, receiver) {
-    if (!_supabase) _supabase = createSupabaseClient();
-    return Reflect.get(_supabase, prop, receiver);
-  },
-});
+function getSupabasePublishableKey() {
+  const env = import.meta.env as Record<string, string | undefined>;
+  return (
+    env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    env.VITE_SUPABASE_ANON_KEY ||
+    env.SUPABASE_PUBLISHABLE_KEY ||
+    (typeof process !== "undefined" && process.env ? (process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_ANON_KEY"]) : undefined)
+  );
+}
