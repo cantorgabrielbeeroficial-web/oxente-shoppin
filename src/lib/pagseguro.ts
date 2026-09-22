@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const PAGBANK_ORDERS_URL = "https://api.pagseguro.com/orders";
+const PAGBANK_CHECKOUTS_URL = "https://api.pagseguro.com/checkouts";
 
 export type PagSeguroCustomer = {
   name: string;
@@ -20,6 +21,11 @@ export type PagSeguroPixOrder = {
   orderId: string;
   code: string;
   qrCodeImageUrl: string;
+};
+
+export type PagSeguroHostedCheckout = {
+  orderId: string;
+  paymentUrl: string;
 };
 
 const pagBankResponseSchema = z.object({
@@ -122,6 +128,73 @@ async function createPagSeguroPixOrderRequest(
   };
 }
 
+const pagBankCheckoutResponseSchema = z.object({
+  links: z.array(z.object({ rel: z.string(), href: z.string().url() })).min(1),
+});
+
+async function createPagSeguroHostedCheckoutRequest(
+  input: CreatePagSeguroPixOrderInput,
+): Promise<PagSeguroHostedCheckout> {
+  const token = process.env["PAGSEGURO_TOKEN"];
+  if (!token) throw new Error("PAGSEGURO_TOKEN não configurado.");
+
+  const amount = amountInCents(input.amount);
+  const customer = {
+    name: input.customer.name.trim(),
+    email: input.customer.email.trim(),
+    ...(input.customer.taxId ? { tax_id: input.customer.taxId.replace(/\D/g, "") } : {}),
+  };
+  const appUrl = process.env["APP_URL"] ?? process.env["VITE_APP_URL"];
+  if (!appUrl) throw new Error("APP_URL não configurado para o checkout PagBank.");
+
+  const response = await fetch(PAGBANK_CHECKOUTS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "x-idempotency-key": `${input.orderId}-checkout`,
+    },
+    body: JSON.stringify({
+      reference_id: input.orderId,
+      customer,
+      customer_modifiable: false,
+      items: [
+        {
+          reference_id: input.orderId,
+          name: `Pedido ${input.orderId}`,
+          quantity: 1,
+          unit_amount: amount,
+        },
+      ],
+      payment_methods: [
+        { type: "CREDIT_CARD" },
+        { type: "DEBIT_CARD" },
+        { type: "PIX" },
+      ],
+      return_url: `${appUrl}/pedidos`,
+      redirect_url: `${appUrl}/pedidos`,
+      notification_urls: [`${appUrl}/api/webhooks/pagseguro`],
+      payment_notification_urls: [`${appUrl}/api/webhooks/pagseguro`],
+    }),
+  });
+
+  const responseBody: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message =
+      typeof responseBody === "object" && responseBody !== null && "error_messages" in responseBody
+        ? JSON.stringify(responseBody)
+        : `PagBank retornou HTTP ${response.status}.`;
+    throw new Error(`Falha ao criar checkout de cartão: ${message}`);
+  }
+
+  const parsed = pagBankCheckoutResponseSchema.safeParse(responseBody);
+  if (!parsed.success) throw new Error("PagBank não retornou um link de checkout válido.");
+  const paymentUrl = parsed.data.links.find((link) => link.rel.toUpperCase() === "PAY")?.href;
+  if (!paymentUrl) throw new Error("PagBank não retornou o link de pagamento.");
+  return { orderId: input.orderId, paymentUrl };
+}
+
 const createPagSeguroPixOrderInput = z.object({
   orderId: z.string().uuid(),
   customer: z.object({
@@ -157,5 +230,39 @@ export const createPagSeguroPixOrder = createServerFn({ method: "POST" })
       orderId: order.id,
       amount: Number(order.total),
       customer,
+    });
+  });
+
+const createPagSeguroCheckoutInput = z.object({
+  orderId: z.string().uuid(),
+  customer: z.object({
+    name: z.string().trim().min(2).max(120),
+    email: z.string().email().max(320),
+    taxId: z.string().trim().min(11).max(18).optional(),
+  }),
+});
+
+export const createPagSeguroHostedCheckout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => createPagSeguroCheckoutInput.parse(input))
+  .handler(async ({ data, context }): Promise<PagSeguroHostedCheckout> => {
+    const { data: order, error } = await context.supabase
+      .from("orders")
+      .select("id, total, status")
+      .eq("id", data.orderId)
+      .eq("buyer_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!order) throw new Error("Pedido não encontrado.");
+    if (order.status === "paid") throw new Error("Este pedido já foi pago.");
+    if (order.status !== "pendente") throw new Error("Este pedido não está aguardando pagamento.");
+    return createPagSeguroHostedCheckoutRequest({
+      orderId: order.id,
+      amount: Number(order.total),
+      customer: {
+        name: data.customer.name,
+        email: data.customer.email,
+        ...(data.customer.taxId ? { taxId: data.customer.taxId } : {}),
+      },
     });
   });

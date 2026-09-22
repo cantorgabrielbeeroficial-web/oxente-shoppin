@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { createAddress, listAddresses, listCart, listMyOrders, placeOrder } from "@/lib/shop.functions";
-import { createPagSeguroPixOrder } from "@/lib/pagseguro";
+import { createPagSeguroHostedCheckout, createPagSeguroPixOrder } from "@/lib/pagseguro";
 import { formatBRL } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ function CheckoutPage() {
   const [selected, setSelected] = useState<string>("");
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const [useCredits, setUseCredits] = useState(true);
+  const [paymentMethod, setPaymentMethod] = useState<"pix" | "card">("pix");
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [pix, setPix] = useState<{ code: string; qrCodeImageUrl: string } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -62,6 +63,7 @@ function CheckoutPage() {
   const saveAddress = useServerFn(createAddress);
   const order = useServerFn(placeOrder);
   const createPix = useServerFn(createPagSeguroPixOrder);
+  const createCardCheckout = useServerFn(createPagSeguroHostedCheckout);
 
   const addressMutation = useMutation({
     mutationFn: () => saveAddress({ data: { ...form, is_default: true } }),
@@ -86,7 +88,8 @@ function CheckoutPage() {
         return;
       }
       setCurrentOrderId(orderId);
-      pixMutation.mutate(orderId);
+      if (paymentMethod === "pix") pixMutation.mutate(orderId);
+      else cardCheckoutMutation.mutate(orderId);
     },
     onError: (error: Error) => toast.error(error.message || "Não foi possível concluir o pedido."),
   });
@@ -108,6 +111,25 @@ function CheckoutPage() {
       toast.success("Pix gerado. Escaneie o QR Code para pagar.");
     },
     onError: (error: Error) => toast.error(error.message || "Não foi possível gerar o Pix."),
+  });
+
+  const cardCheckoutMutation = useMutation({
+    mutationFn: (orderId: string) =>
+      createCardCheckout({
+        data: {
+          orderId,
+          customer: {
+            name: form.recipient_name,
+            email: form.email,
+            ...(form.taxId.trim() ? { taxId: form.taxId } : {}),
+          },
+        },
+      }),
+    onSuccess: ({ paymentUrl }) => window.location.assign(paymentUrl),
+    onError: (error: Error) => {
+      console.error("[CARD_CHECKOUT_ERROR]", error);
+      toast.error(error.message || "Não foi possível abrir o pagamento por cartão.");
+    },
   });
 
   const paymentQuery = useQuery({
@@ -312,19 +334,34 @@ function CheckoutPage() {
           <span className="text-sm text-muted-foreground">Total</span>
           <span className="text-xl font-extrabold text-primary">{formatBRL(total)}</span>
         </div>
+        <div className="mt-4 space-y-2">
+          <Label>Forma de pagamento</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" variant={paymentMethod === "pix" ? "default" : "outline"} onClick={() => setPaymentMethod("pix")}>
+              Pix
+            </Button>
+            <Button type="button" variant={paymentMethod === "card" ? "default" : "outline"} onClick={() => setPaymentMethod("card")}>
+              Crédito ou débito
+            </Button>
+          </div>
+        </div>
         <Button
           className="mt-4 w-full"
           size="lg"
-          disabled={!addressId || orderMutation.isPending || pixMutation.isPending}
+          disabled={!addressId || orderMutation.isPending || pixMutation.isPending || cardCheckoutMutation.isPending}
           onClick={() => {
-            if (!form.email || !form.taxId || !form.recipient_name) {
-              toast.error("Informe nome, e-mail e CPF para gerar o Pix.");
+            if (!form.email || !form.recipient_name) {
+              toast.error("Informe nome e e-mail para continuar.");
               return;
             }
             orderMutation.mutate(addressId);
           }}
         >
-          {pixMutation.isPending ? "Gerando Pix..." : "Pagar com Pix"}
+          {pixMutation.isPending || cardCheckoutMutation.isPending
+            ? "Abrindo pagamento..."
+            : paymentMethod === "pix"
+              ? "Pagar com Pix"
+              : "Pagar com cartão"}
         </Button>
         <p className="mt-3 text-center text-xs text-muted-foreground">
           {tier.label}: você receberá {formatBRL(cashbackPreview)} de cashback (
