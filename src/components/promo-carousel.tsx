@@ -69,26 +69,31 @@ export function PromoCarousel() {
 
   return (
     <div className="relative">
-      <Carousel setApi={setApi} plugins={[plugin.current]} opts={{ loop: true }} className="w-full">
-        <CarouselContent>
+      <Carousel
+        setApi={setApi}
+        plugins={[plugin.current]}
+        opts={{ loop: true, align: "start" }}
+        className="w-full"
+      >
+        <CarouselContent className="md:ml-0">
           {slides.map((slide) => (
-            <CarouselItem key={slide.id}>
+            <CarouselItem key={slide.id} className="basis-1/2 pl-4 md:basis-full">
               <Link
                 to={slide.to}
-                className="relative flex h-[118px] items-center gap-3 overflow-hidden rounded-2xl bg-primary p-3 text-primary-foreground md:h-[140px]"
+                className="relative flex h-[84px] min-w-0 items-center gap-2 overflow-hidden rounded-xl bg-primary p-2 text-primary-foreground md:h-[140px] md:gap-3 md:rounded-2xl md:p-3"
               >
-                <div className="flex min-w-0 flex-1 flex-col justify-center rounded-xl bg-white px-3 py-2">
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-primary">
+                <div className="flex min-w-0 flex-1 flex-col justify-center rounded-lg bg-white px-2 py-2 md:rounded-xl md:px-3">
+                  <span className="flex items-center gap-1 truncate text-[9px] font-semibold text-primary md:text-[11px]">
                     <Play className="h-3 w-3 fill-current" /> {slide.tag}
                   </span>
-                  <span className="truncate text-xl font-black leading-tight text-foreground">
+                  <span className="truncate text-sm font-black leading-tight text-foreground md:text-xl">
                     {slide.title}
                   </span>
-                  <span className="truncate text-[11px] font-medium text-muted-foreground">
+                  <span className="hidden truncate text-[11px] font-medium text-muted-foreground md:block">
                     {slide.subtitle}
                   </span>
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="hidden shrink-0 gap-2 md:flex">
                   {slide.slots.map((slot) => (
                     <span
                       key={slot}
@@ -98,7 +103,7 @@ export function PromoCarousel() {
                     </span>
                   ))}
                 </div>
-                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-primary-foreground/20 px-3 text-[10px] font-semibold">
+                <span className="absolute bottom-1 right-2 rounded-full bg-primary-foreground/20 px-2 text-[8px] font-semibold md:left-1/2 md:right-auto md:-translate-x-1/2 md:px-3 md:text-[10px]">
                   Resgate agora ▸
                 </span>
               </Link>

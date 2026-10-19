@@ -1,30 +1,27 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
   BadgeCheck,
   Bell,
+  Check,
   ChevronDown,
-  ChevronRight,
-  Grid2X2,
+  ChevronLeft,
+  Copy,
   Heart,
   Home,
-  Image,
-  Infinity as BoomerangIcon,
   MessageCircle,
+  MoreHorizontal,
   PlaySquare,
   Plus,
-  RefreshCw,
   Reply,
-  Search,
-  Settings2,
+  Send,
+  Share2,
   ShoppingCart,
-  Sparkles,
   Star,
-  Type,
   User,
   X,
-  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/format";
@@ -32,13 +29,13 @@ import { useAuthUser } from "@/hooks/use-auth";
 import { hasSupabaseConfig, supabase } from "@/integrations/supabase/client";
 
 const TABS = ["Vídeos", "Lives", "Para você", "Seguindo"] as const;
-const CAPTURE_MODES = ["POST", "STORIES", "INSTANTS", "REELS", "LIVE"] as const;
 const FEED = [
   {
     id: "1",
     cover: "/Banner-do-inicio-topo-01.png",
     store: "Ateliê do Sertão",
     storeSlug: "atelie-do-sertao",
+    avatar: "/Banner-do-inicio-topo-01.png",
     caption: "Oxente! Rede de descanso feita no tear, direto do Cariri 🧵",
     viewers: 1284,
     likes: "12,4 mil",
@@ -52,6 +49,7 @@ const FEED = [
     videoUrl: "/video-teste.mp4",
     store: "Raquel Santos",
     storeSlug: "raquel-santos",
+    avatar: "/Banner-do-inicio-topo-01.png",
     caption:
       "Vestido de botão longo alfaiataria em cor madeira, com corte elegante e acabamento sofisticado para ocasiões especiais.",
     viewers: 842,
@@ -65,6 +63,17 @@ const FEED = [
     live: false,
   },
 ];
+
+interface FloatingHeart {
+  id: number;
+  left: number;
+}
+
+interface FloatingCoinReward {
+  id: number;
+}
+
+const EMOJI_LIST = ["❤️", "🔥", "👏", "🌵", "😍", "✨"];
 
 export const Route = createFileRoute("/live")({
   head: () => ({
@@ -88,56 +97,123 @@ export const Route = createFileRoute("/live")({
 function LivePage() {
   const { user } = useAuthUser();
   const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Vídeos");
-  const [searchOpen, setSearchOpen] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState({
     avatarUrl: "",
     fullName: "Usuária Oxente",
     handle: "usuario_oxente",
   });
-  const [profileSearch, setProfileSearch] = useState("");
-  const [followedStores, setFollowedStores] = useState<string[]>([]);
   const [likedItems, setLikedItems] = useState<string[]>([]);
+  const [followedStores, setFollowedStores] = useState<string[]>([]);
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({
+    "1": 12846,
     "2": 3840,
   });
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({
+    "1": 318,
     "2": 41,
   });
   const [shareCounts, setShareCounts] = useState<Record<string, number>>({
+    "1": 45,
     "2": 128,
   });
-  const [showAnnouncementDetails, setShowAnnouncementDetails] = useState(false);
-  const [publishOpen, setPublishOpen] = useState(false);
-  const [cameraMode, setCameraMode] = useState<"photo" | "video">("photo");
-  const [captureMode, setCaptureMode] = useState("STORIES");
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
-  const [cameraError, setCameraError] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
-  const [publishCaption, setPublishCaption] = useState("");
-  const [selectedMedia, setSelectedMedia] = useState<{
-    url: string;
-    type: "image" | "video";
-  } | null>(null);
-  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [liveComments, setLiveComments] = useState<
-    Record<string, Array<{ id: string; body: string; userId: string }>>
-  >({});
+
+  // ESTADO DA BARRA DE ANÚNCIO (ABRE AUTOMÁTICO E FECHA COM 10 SEGUNDOS)
+  const [showAnnouncementDetails, setShowAnnouncementDetails] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowAnnouncementDetails(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ESTADO DO MODAL DE COMENTÁRIOS DOS VÍDEOS
+  const [commentsModalOpen, setCommentsModalOpen] = useState(false);
+  const [selectedVideoId, setSelectedVideoId] = useState<string>("2");
+  const [videoInputText, setVideoInputText] = useState("");
+
+  // ESTADO DA GAVETA DE COMPARTILHAMENTO
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareTargetItem, setShareTargetItem] = useState<(typeof FEED)[number] | null>(null);
+
+  // ESTADO DO PROGRESSO E ANIMAÇÃO DA MOEDA OXENTE
+  const [coinProgress, setCoinProgress] = useState(25);
+  const [isDraggingCoin, setIsDraggingCoin] = useState(false);
+  const [floatingCoinRewards, setFloatingCoinRewards] = useState<FloatingCoinReward[]>([]);
+
+  const [liveInputText, setLiveInputText] = useState("");
+  const [floatingHearts, setFloatingHearts] = useState<FloatingHeart[]>([]);
+  const [commentsMap, setCommentsMap] = useState<
+    Record<string, Array<{ id: string; body: string; name: string; avatar?: string; time: string }>>
+  >({
+    "1": [
+      { id: "c1", body: "de entrega para Paulista - PE?", name: "Maria Clara", time: "2m" },
+      { id: "c2", body: "Já garanti a minha com o cupom! 🌵❤️", name: "Ana Souza", time: "1m" },
+      { id: "c3", body: "oi", name: "Raquel Santos", time: "agora" },
+    ],
+    "2": [
+      { id: "vc1", body: "Que lindo esse vestido! Coube certinho? 😍", name: "Juliana Silva", time: "10m" },
+      { id: "vc2", body: "O tecido é linho ou viscose?", name: "Mariana Costa", time: "5m" },
+      { id: "vc3", body: "Entregam em Recife?", name: "Carla Pimentel", time: "2m" },
+    ],
+  });
+
+  // ESTADO PARA ESCONDER/EXIBIR APENAS AS ABAS NA LIVE
+  const [showLiveTabs, setShowLiveTabs] = useState(true);
+  const liveTabsTimer = useRef<NodeJS.Timeout | null>(null);
+
   const visibleFeed =
     tab === "Vídeos"
       ? FEED.filter((item) => !item.live)
       : tab === "Lives"
         ? FEED.filter((item) => item.live)
-        : tab === "Seguindo"
-          ? FEED.filter((item) => followedStores.includes(item.store))
-          : FEED;
-  const searchedFeed = visibleFeed.filter((item) =>
-    item.store.toLowerCase().includes(profileSearch.trim().toLowerCase()),
-  );
+        : FEED;
+
+  const isCurrentLiveTab = tab === "Lives";
+
+  // PROGRESSO DO ANEL E EFEITO VISUAL DE FATURAMENTO NO ÍCONE
+  useEffect(() => {
+    if (isCurrentLiveTab) return;
+    const interval = setInterval(() => {
+      setCoinProgress((prev) => {
+        if (prev >= 100) {
+          const newReward: FloatingCoinReward = { id: Date.now() };
+          setFloatingCoinRewards((current) => [...current, newReward]);
+          setTimeout(() => {
+            setFloatingCoinRewards((current) => current.filter((r) => r.id !== newReward.id));
+          }, 1200);
+
+          return 0;
+        }
+        return prev + 10;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isCurrentLiveTab]);
+
+  // TIMER PARA AUTO-HIDE APENAS DAS ABAS NA LIVE
+  const resetLiveTabsTimer = useCallback(() => {
+    setShowLiveTabs(true);
+    if (liveTabsTimer.current) clearTimeout(liveTabsTimer.current);
+    liveTabsTimer.current = setTimeout(() => {
+      setShowLiveTabs(false);
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    if (isCurrentLiveTab) {
+      resetLiveTabsTimer();
+    } else {
+      setShowLiveTabs(true);
+      if (liveTabsTimer.current) clearTimeout(liveTabsTimer.current);
+    }
+    return () => {
+      if (liveTabsTimer.current) clearTimeout(liveTabsTimer.current);
+    };
+  }, [isCurrentLiveTab, resetLiveTabsTimer]);
 
   useEffect(() => {
     if (!user || !hasSupabaseConfig()) {
@@ -154,17 +230,6 @@ function LivePage() {
       (userMetadata["full_name"] as string | undefined) ||
       user.email?.split("@")[0] ||
       "Raquel Santos";
-    const sanitizedHandle =
-      fullName
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9\s_]/g, "")
-        .replace(/\s+/g, "_")
-        .replace(/^_+|_+$/g, "") || "raquel_santos";
-
-    let active = true;
 
     supabase
       .from("profiles")
@@ -172,132 +237,17 @@ function LivePage() {
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (!active) return;
-
         const profileData = (data ?? {}) as Record<string, unknown>;
-        const profileName = (profileData["full_name"] as string | undefined) || fullName;
-        const avatarUrl =
-          (profileData["avatar_url"] as string | undefined) ||
-          (userMetadata["avatar_url"] as string | undefined) ||
-          (userMetadata["picture"] as string | undefined) ||
-          "";
-
         setCurrentUserProfile({
-          avatarUrl,
-          fullName: profileName || "Raquel Santos",
-          handle: sanitizedHandle === "usuario_oxente" ? "raquel_santos" : sanitizedHandle,
+          avatarUrl: (profileData["avatar_url"] as string) || "",
+          fullName: (profileData["full_name"] as string) || fullName,
+          handle: "raquel_santos",
         });
       });
-
-    return () => {
-      active = false;
-    };
   }, [user]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setShowAnnouncementDetails(true), 5000);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!showAnnouncementDetails) return;
-
-    const timer = window.setTimeout(() => setShowAnnouncementDetails(false), 15000);
-    return () => window.clearTimeout(timer);
-  }, [showAnnouncementDetails]);
-
-  useEffect(() => {
-    if (!hasSupabaseConfig()) return;
-
-    let active = true;
-    Promise.all([
-      supabase.from("video_likes").select("content_id, user_id"),
-      supabase.from("video_shares").select("content_id"),
-      supabase.from("live_comments").select("id, content_id, body, user_id").order("created_at"),
-    ]).then(([likesResult, sharesResult, commentsResult]) => {
-      if (!active) return;
-      const counts: Record<string, number> = {};
-      const mine: string[] = [];
-      (likesResult.data ?? []).forEach((like) => {
-        counts[like.content_id] = (counts[like.content_id] ?? 0) + 1;
-        if (user && like.user_id === user.id) mine.push(like.content_id);
-      });
-      const comments: Record<string, Array<{ id: string; body: string; userId: string }>> = {};
-      const shares: Record<string, number> = {};
-      (sharesResult.data ?? []).forEach((share) => {
-        shares[share.content_id] = (shares[share.content_id] ?? 0) + 1;
-      });
-      (commentsResult.data ?? []).forEach((comment) => {
-        comments[comment.content_id] = [
-          ...(comments[comment.content_id] ?? []),
-          { id: comment.id, body: comment.body, userId: comment.user_id },
-        ];
-      });
-      setLikeCounts(counts);
-      setShareCounts(shares);
-      setLikedItems(mine);
-      setCommentCounts(
-        Object.fromEntries(Object.entries(comments).map(([id, values]) => [id, values.length])),
-      );
-      setLiveComments(comments);
-    });
-    return () => {
-      active = false;
-    };
-  }, [user]);
-
-  useEffect(() => {
-    if (!hasSupabaseConfig()) return;
-
-    const channel = supabase
-      .channel("live-comments")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "live_comments" },
-        (payload) => {
-          const comment = payload.new as {
-            id: string;
-            content_id: string;
-            body: string;
-            user_id: string;
-          };
-          setLiveComments((current) => ({
-            ...current,
-            [comment.content_id]: [
-              ...(current[comment.content_id] ?? []).slice(-4),
-              { id: comment.id, body: comment.body, userId: comment.user_id },
-            ],
-          }));
-          setCommentCounts((current) => ({
-            ...current,
-            [comment.content_id]: (current[comment.content_id] ?? 0) + 1,
-          }));
-        },
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, []);
 
   async function toggleLike(itemId: string) {
     const liked = likedItems.includes(itemId);
-
-    if (user) {
-      const result = liked
-        ? await supabase
-            .from("video_likes")
-            .delete()
-            .eq("content_id", itemId)
-            .eq("user_id", user.id)
-        : await supabase.from("video_likes").insert({ content_id: itemId, user_id: user.id });
-
-      if (result.error) {
-        toast.error("Não foi possível registrar sua curtida.");
-        return;
-      }
-    }
-
     setLikedItems((current) =>
       liked ? current.filter((id) => id !== itemId) : [...current, itemId],
     );
@@ -305,896 +255,713 @@ function LivePage() {
       ...current,
       [itemId]: Math.max(0, (current[itemId] ?? 0) + (liked ? -1 : 1)),
     }));
-
-    if (!user) {
-      toast.success(
-        liked ? "Curtida removida no modo de teste." : "Curtida registrada no modo de teste.",
-      );
-    }
   }
 
-  async function shareVideo(item: (typeof FEED)[number]) {
-    const url = `${window.location.origin}/live#${item.id}`;
-    const shareData = {
-      title: item.product.name,
-      text: item.caption,
-      url,
-    };
-
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
-        toast.success("Link do vídeo copiado!");
-      }
-    } catch (error) {
-      if ((error as DOMException).name !== "AbortError") {
-        toast.error("Não foi possível compartilhar o vídeo.");
-      }
-    }
-
-    if (user) {
-      const { error } = await supabase.from("video_shares").insert({
-        content_id: item.id,
-        user_id: user.id,
-      });
-      if (error) {
-        toast.error("Não foi possível registrar o compartilhamento.");
-        return;
-      }
-    }
-
-    setShareCounts((current) => ({
-      ...current,
-      [item.id]: (current[item.id] ?? 0) + 1,
-    }));
-
-    if (!user) {
-      toast.success("Compartilhamento testado com sucesso.");
-    }
-  }
-
-  function openAffiliateProfile() {
-    const handle = currentUserProfile.handle || "raquel_santos";
-    navigate({ to: "/afiliado/$username", params: { username: handle } });
-  }
-
-  async function addComment(itemId: string) {
-    const commentBody = window.prompt("Escreva seu comentário:");
-    if (commentBody === null) return;
-
-    const sanitized = commentBody.trim();
-    if (!sanitized) {
-      toast.error("Seu comentário não pode estar vazio.");
-      return;
-    }
-
-    if (user) {
-      const { data, error } = await supabase
-        .from("live_comments")
-        .insert({ content_id: itemId, body: sanitized, user_id: user.id })
-        .select("id, content_id, body, user_id")
-        .single();
-
-      if (error) {
-        toast.error("Não foi possível enviar o comentário.");
-        return;
-      }
-
-      setLiveComments((current) => ({
-        ...current,
-        [itemId]: [
-          ...(current[itemId] ?? []),
-          { id: data.id, body: data.body, userId: data.user_id },
-        ],
-      }));
-    } else {
-      const localCommentId = `demo-${itemId}-${Date.now()}`;
-      setLiveComments((current) => ({
-        ...current,
-        [itemId]: [
-          ...(current[itemId] ?? []),
-          { id: localCommentId, body: sanitized, userId: "demo-user" },
-        ],
-      }));
-    }
-
-    setCommentCounts((current) => ({
-      ...current,
-      [itemId]: (current[itemId] ?? 0) + 1,
-    }));
-
-    if (!user) {
-      toast.success("Comentário adicionado no modo de teste.");
-    } else {
-      toast.success("Comentário enviado!");
-    }
-  }
-
-  const stopCameraStream = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-    mediaRecorderRef.current = null;
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setCameraStream(null);
-    if (cameraVideoRef.current) {
-      cameraVideoRef.current.srcObject = null;
-    }
-    setIsRecording(false);
-  }, []);
-
-  const openGalleryPicker = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const startCameraStream = useCallback(async () => {
-    if (!publishOpen) return;
-
-    if (!window.isSecureContext) {
-      setCameraError(
-        "A câmera só funciona em uma conexão segura (HTTPS). Abra o app pelo endereço HTTPS.",
-      );
-      toast.error("Conexão insegura: o navegador bloqueou o acesso à câmera.");
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError("Seu navegador não suporta acesso à câmera.");
-      return;
-    }
-
-    try {
-      const videoConstraints = {
-        facingMode: { ideal: facingMode },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      };
-      let stream: MediaStream;
-
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: videoConstraints,
-          audio: true,
-        });
-      } catch {
-        // A microphone denial must not prevent the camera preview from opening.
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: videoConstraints,
-          audio: false,
-        });
-      }
-
-      streamRef.current = stream;
-      setCameraStream(stream);
-      setCameraError("");
-    } catch (error) {
-      const errorName = error instanceof DOMException ? error.name : "";
-      const message =
-        errorName === "NotAllowedError" || errorName === "SecurityError"
-          ? "O acesso à câmera foi bloqueado. Permita a câmera nas configurações do navegador e tente novamente."
-          : errorName === "NotFoundError"
-            ? "Nenhuma câmera foi encontrada neste dispositivo. Você pode escolher uma mídia da galeria."
-            : "Não foi possível acessar a câmera. Verifique as permissões do navegador ou escolha uma mídia da galeria.";
-      setCameraError(message);
-      toast.error(message);
-    }
-  }, [facingMode, publishOpen]);
-
-  const applySelectedMedia = useCallback((file: File) => {
-    setSelectedMedia((current) => {
-      if (current) {
-        URL.revokeObjectURL(current.url);
-      }
-
-      return {
-        url: URL.createObjectURL(file),
-        type: file.type.startsWith("video/") ? "video" : "image",
-      };
-    });
-  }, []);
-
-  function handleMediaChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    applySelectedMedia(file);
-    event.target.value = "";
-  }
-
-  function closePublish() {
-    stopCameraStream();
-    setSelectedMedia((current) => {
-      if (current) {
-        URL.revokeObjectURL(current.url);
-      }
-      return null;
-    });
-    setPublishCaption("");
-    setCameraMode("photo");
-    setCameraError("");
-    setPublishOpen(false);
-  }
-
-  async function capturePhoto() {
-    const video = cameraVideoRef.current;
-    if (!video || !streamRef.current) {
-      toast.error("A câmera ainda não está pronta.");
-      return;
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      toast.error("Não foi possível capturar a imagem.");
-      return;
-    }
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.92),
+  function toggleFollow(storeSlug: string) {
+    setFollowedStores((current) =>
+      current.includes(storeSlug)
+        ? current.filter((slug) => slug !== storeSlug)
+        : [...current, storeSlug]
     );
-
-    if (!blob) {
-      toast.error("Não foi possível salvar a foto.");
-      return;
-    }
-
-    applySelectedMedia(new File([blob], `oxente-photo-${Date.now()}.jpg`, { type: "image/jpeg" }));
   }
 
-  function toggleVideoCapture() {
-    if (!streamRef.current) {
-      toast.error("A câmera ainda não está pronta.");
-      return;
-    }
+  function openShareDrawer(item: (typeof FEED)[number]) {
+    setShareTargetItem(item);
+    setShareModalOpen(true);
+  }
 
-    if (isRecording) {
-      mediaRecorderRef.current?.stop();
-      setIsRecording(false);
-      return;
-    }
-
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-      ? "video/webm;codecs=vp9"
-      : MediaRecorder.isTypeSupported("video/webm")
-        ? "video/webm"
-        : "";
-
-    const recorder = mimeType
-      ? new MediaRecorder(streamRef.current, { mimeType })
-      : new MediaRecorder(streamRef.current);
-    const chunks: Blob[] = [];
-
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        chunks.push(event.data);
+  async function handleCopyLink() {
+    if (!shareTargetItem) return;
+    const url = `${window.location.origin}/live#${shareTargetItem.id}`;
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        toast.success("Link copiado para a área de transferência!");
       }
-    };
-
-    recorder.onstop = () => {
-      const recordedBlob = new Blob(chunks, {
-        type: chunks[0]?.type || "video/webm",
-      });
-
-      if (recordedBlob.size === 0) {
-        toast.error("Não foi possível gravar o vídeo.");
-        return;
-      }
-
-      applySelectedMedia(
-        new File([recordedBlob], `oxente-video-${Date.now()}.webm`, {
-          type: recordedBlob.type || "video/webm",
-        }),
-      );
-    };
-
-    recorder.start();
-    mediaRecorderRef.current = recorder;
-    setIsRecording(true);
-    toast.success("Gravação iniciada.");
-  }
-
-  function publishMedia() {
-    if (!selectedMedia) {
-      toast.error("Escolha uma foto ou vídeo primeiro.");
-      return;
+    } catch {
+      toast.error("Erro ao copiar o link.");
     }
-    closePublish();
-    toast.success("Conteúdo preparado para publicação em modo de teste.");
+    setShareModalOpen(false);
   }
 
-  function toggleCamera() {
-    stopCameraStream();
-    setFacingMode((current) => (current === "environment" ? "user" : "environment"));
+  function handleSharePlatform(platform: "whatsapp" | "facebook" | "twitter" | "native") {
+    if (!shareTargetItem) return;
+    const url = encodeURIComponent(`${window.location.origin}/live#${shareTargetItem.id}`);
+    const text = encodeURIComponent(`Confira ${shareTargetItem.product.name} na Bodega Oxente!`);
+
+    if (platform === "whatsapp") {
+      window.open(`https://api.whatsapp.com/send?text=${text}%20${url}`, "_blank");
+    } else if (platform === "facebook") {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank");
+    } else if (platform === "twitter") {
+      window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
+    } else if (platform === "native" && navigator.share) {
+      navigator
+        .share({
+          title: shareTargetItem.product.name,
+          text: shareTargetItem.caption,
+          url: `${window.location.origin}/live#${shareTargetItem.id}`,
+        })
+        .catch(() => {});
+    }
+
+    if (shareTargetItem) {
+      setShareCounts((current) => ({
+        ...current,
+        [shareTargetItem.id]: (current[shareTargetItem.id] ?? 0) + 1,
+      }));
+    }
+    setShareModalOpen(false);
   }
 
-  useEffect(() => {
-    if (!publishOpen) return;
+  function openCommentsModal(itemId: string) {
+    setSelectedVideoId(itemId);
+    setCommentsModalOpen(true);
+  }
 
-    void startCameraStream();
+  function handleSendVideoComment(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const text = videoInputText.trim();
+    if (!text) return;
 
-    return () => {
-      stopCameraStream();
+    const newComment = {
+      id: `comment-${Date.now()}`,
+      body: text,
+      name: currentUserProfile.fullName || "Você",
+      avatar: currentUserProfile.avatarUrl,
+      time: "agora",
     };
-  }, [publishOpen, facingMode, startCameraStream, stopCameraStream]);
 
-  useEffect(() => {
-    const video = cameraVideoRef.current;
-    if (!video || !cameraStream) return;
+    setCommentsMap((prev) => ({
+      ...prev,
+      [selectedVideoId]: [newComment, ...(prev[selectedVideoId] ?? [])],
+    }));
 
-    video.srcObject = cameraStream;
-    video.muted = true;
-    video.playsInline = true;
-    void video.play().catch(() => undefined);
+    setCommentCounts((prev) => ({
+      ...prev,
+      [selectedVideoId]: (prev[selectedVideoId] ?? 0) + 1,
+    }));
 
-    return () => {
-      if (video.srcObject === cameraStream) video.srcObject = null;
+    setVideoInputText("");
+  }
+
+  async function handleSendLiveComment(itemId: string) {
+    const text = liveInputText.trim();
+    if (!text) return;
+
+    const newComment = {
+      id: `live-${Date.now()}`,
+      body: text,
+      name: currentUserProfile.fullName || "Você",
+      time: "agora",
     };
-  }, [cameraStream]);
+
+    setCommentsMap((prev) => ({
+      ...prev,
+      [itemId]: [...(prev[itemId] ?? []), newComment],
+    }));
+
+    setCommentCounts((prev) => ({
+      ...prev,
+      [itemId]: (prev[itemId] ?? 0) + 1,
+    }));
+
+    setLiveInputText("");
+  }
+
+  // CÁLCULO DO ANEL DE PROGRESSO
+  const radius = 22;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (coinProgress / 100) * circumference;
 
   return (
-    <div className="relative h-[100svh] min-h-[100svh] w-full overflow-hidden bg-black text-white">
-      <div className="absolute inset-x-0 top-0 z-30 bg-gradient-to-b from-black/60 to-transparent px-3 pb-8 pt-2">
-        <div className="flex h-9 items-center justify-between">
+    <div 
+      ref={containerRef}
+      className="relative h-[100svh] min-h-[100svh] w-full overflow-hidden bg-black text-white"
+      onClick={() => {
+        if (isCurrentLiveTab) resetLiveTabsTimer();
+      }}
+    >
+      <style>{`
+        @keyframes floatUp {
+          0% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translateY(-140px) scale(1.3);
+          }
+        }
+        .animate-float-up {
+          animation: floatUp 1.5s ease-out forwards;
+        }
+        @keyframes coinRewardFloat {
+          0% {
+            opacity: 1;
+            transform: translateY(0) scale(0.8);
+          }
+          100% {
+            opacity: 0;
+            transform: translateY(-35px) scale(1.2);
+          }
+        }
+        .animate-coin-reward {
+          animation: coinRewardFloat 1s ease-out forwards;
+        }
+      `}</style>
+
+      {/* CABEÇALHO DA ABA VÍDEOS: SETINHA VOLTAR NA ESQUERDA E ABAS CENTRALIZADAS */}
+      {!isCurrentLiveTab && (
+        <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-3 pt-8 pb-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
           <button
             type="button"
-            aria-label="Abrir perfil do afiliado"
-            className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 text-white shadow-sm hover:bg-white/15"
-            onClick={openAffiliateProfile}
+            onClick={() => navigate({ to: "/" })}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/90 hover:text-white hover:bg-white/10 transition active:scale-90 shrink-0"
+            aria-label="Voltar"
           >
-            {currentUserProfile.avatarUrl ? (
-              <img
-                src={currentUserProfile.avatarUrl}
-                alt={currentUserProfile.fullName}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <User className="h-5 w-5" />
-            )}
+            <ChevronLeft className="h-6 w-6 drop-shadow" />
           </button>
-          <span className="text-lg font-extrabold tracking-wide text-white">Bodega</span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              aria-label="Notificações"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10"
-            >
-              <Bell className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              aria-label="Criar"
-              onClick={() => navigate({ to: "/criar-conteudo" })}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10"
-            >
-              <Plus className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-        {searchOpen && (
-          <div className="mt-2 flex items-center gap-2 rounded-full bg-white/15 px-3 py-2">
-            <Search className="h-4 w-4 text-white/70" />
-            <input
-              autoFocus
-              value={profileSearch}
-              onChange={(event) => setProfileSearch(event.target.value)}
-              placeholder="Buscar perfis e lojas"
-              aria-label="Buscar perfis e lojas"
-              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/60"
-            />
-          </div>
-        )}
-        <div className="mt-2 flex justify-center gap-6">
-          {TABS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setTab(item)}
-              aria-pressed={tab === item}
-              className={cn(
-                "relative text-[13px] font-medium tracking-[0.01em] transition-all duration-200",
-                tab === item ? "text-white opacity-100" : "text-white/60 opacity-70",
-              )}
-            >
-              {item}
-              {tab === item && (
-                <span className="absolute -bottom-1.5 left-1/2 h-[1px] w-3.5 -translate-x-1/2 rounded-full bg-zinc-400/45" />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      <div className="mx-auto h-full max-w-md snap-y snap-mandatory overflow-y-auto overscroll-y-contain touch-pan-y [-webkit-overflow-scrolling:touch]">
-        {searchedFeed.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-8 text-center">
-            <div>
-              <p className="text-base font-bold text-white">Ainda não tem conteúdo por aqui.</p>
-              <p className="mt-2 text-sm text-white/70">
-                Volte em breve para acompanhar novidades das lojas Oxente.
-              </p>
-            </div>
-          </div>
-        ) : (
-          searchedFeed.map((item) => (
-            <section
-              key={item.id}
-              className="relative flex h-[100svh] min-h-[100svh] snap-start items-end overflow-hidden"
-            >
-              {item.videoUrl ? (
-                <video
-                  src={item.videoUrl}
-                  poster={item.cover}
-                  muted
-                  autoPlay
-                  loop
-                  playsInline
-                  className="absolute inset-0 h-full w-full object-cover [filter:saturate(1.1)_contrast(1.05)]"
-                />
-              ) : (
-                <img
-                  src={item.cover}
-                  alt={item.store}
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
-
-              {item.live && (
-                <div className="absolute left-4 top-4 z-10 flex items-center gap-2">
-                  <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase text-primary-foreground shadow-lg">
-                    AO VIVO
-                  </span>
-                </div>
-              )}
-
-              <div
+          <div className="flex items-center justify-center gap-4 flex-1 pr-8">
+            {TABS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setTab(item)}
                 className={cn(
-                  "absolute right-1 bottom-20 z-20 flex flex-col items-center gap-3 text-white",
+                  "relative text-xs font-bold transition-all whitespace-nowrap drop-shadow",
+                  tab === item
+                    ? "text-white underline decoration-primary underline-offset-4 font-black scale-105"
+                    : "text-white/70 hover:text-white",
                 )}
               >
-                {!item.live && (
-                  <div className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-black/25 shadow-lg backdrop-blur">
-                    <button
-                      type="button"
-                      aria-label="Abrir perfil do afiliado"
-                      className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-extrabold text-white"
-                      onClick={openAffiliateProfile}
-                    >
-                      {currentUserProfile.avatarUrl ? (
-                        <img
-                          src={currentUserProfile.avatarUrl}
-                          alt={currentUserProfile.fullName}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        currentUserProfile.fullName.slice(0, 1).toUpperCase()
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={
-                        followedStores.includes(item.store)
-                          ? `Deixar de seguir ${item.store}`
-                          : `Seguir ${item.store}`
-                      }
-                      aria-pressed={followedStores.includes(item.store)}
-                      className="absolute -bottom-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-white"
-                      onClick={() =>
-                        setFollowedStores((current) =>
-                          current.includes(item.store)
-                            ? current.filter((store) => store !== item.store)
-                            : [...current, item.store],
-                        )
-                      }
-                    >
-                      {!followedStores.includes(item.store) ? (
-                        <Plus className="h-3 w-3" />
-                      ) : (
-                        <span className="text-[10px] font-bold">✓</span>
-                      )}
-                    </button>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  aria-label={likedItems.includes(item.id) ? "Descurtir" : "Curtir"}
-                  aria-pressed={likedItems.includes(item.id)}
-                  className="flex flex-col items-center gap-1"
-                  onClick={() => toggleLike(item.id)}
-                >
-                  <Heart
-                    className={cn(
-                      "h-6 w-6",
-                      likedItems.includes(item.id) && "fill-primary text-primary",
-                    )}
-                  />
-                  <span className="text-[10px]">{likeCounts[item.id] ?? 0}</span>
-                </button>
-                {!item.live && (
-                  <button
-                    type="button"
-                    aria-label="Comentários"
-                    className="flex flex-col items-center gap-1"
-                    onClick={() => addComment(item.id)}
-                  >
-                    <MessageCircle className="h-6 w-6" />
-                    <span className="text-[10px]">{commentCounts[item.id] ?? 11}</span>
-                  </button>
-                )}
-                {!item.live && (
-                  <>
-                    <button
-                      type="button"
-                      aria-label="Compartilhar vídeo"
-                      className="flex flex-col items-center gap-1"
-                      onClick={() => shareVideo(item)}
-                    >
-                      <Reply className="h-6 w-6" />
-                      <span className="text-[10px]">{shareCounts[item.id] ?? 0}</span>
-                    </button>
-                  </>
-                )}
-              </div>
-
-              <div className="relative z-10 w-full space-y-3 p-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pr-16">
-                {!item.live && (
-                  <>
-                    <div className="relative z-40 mb-3 w-full overflow-hidden rounded-xl shadow-lg">
-                      {showAnnouncementDetails && (
-                        <div className="animate-announcement-rise bg-white/95 p-1">
-                          <div className="flex items-center gap-2">
-                            <img
-                              src={item.cover}
-                              alt={item.product.name}
-                              className="h-20 w-20 shrink-0 self-center rounded-lg object-cover"
-                            />
-                            <div className="flex min-w-0 flex-1 flex-col gap-1">
-                              <div className="min-w-0">
-                                <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
-                                  {item.product.name}
-                                </p>
-                                <div className="mt-0.5 flex items-center gap-1.5">
-                                  <span className="rounded-sm bg-primary px-1 py-0.5 text-[9px] font-bold text-primary-foreground">
-                                    Oferta
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground">Frete grátis</span>
-                                </div>
-                                <div className="mt-0.5 flex items-center gap-1">
-                                  <span className="text-sm font-extrabold text-primary">
-                                    {formatBRL(item.product.price)}
-                                  </span>
-                                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                                    <Star className="h-3 w-3 fill-brand-gold text-brand-gold" /> 4,8
-                                  </span>
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                className="flex w-full items-center justify-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-bold text-primary-foreground"
-                              >
-                                <ShoppingCart className="h-3.5 w-3.5" />
-                                Comprar com cupom
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        aria-label={showAnnouncementDetails ? "Fechar anúncio" : "Abrir anúncio"}
-                        onClick={() => setShowAnnouncementDetails((current) => !current)}
-                        className="flex w-full items-center gap-2 border border-white/10 bg-zinc-800/45 px-2.5 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm transition-all"
-                      >
-                        <img
-                          src="/so-logo-bolsa.png"
-                          alt=""
-                          className="h-4 w-4 shrink-0 object-contain"
-                        />
-                        <span className="min-w-0 flex-1 truncate">
-                          R$10 de desconto | Caneca Bodega...
-                        </span>
-                        <ChevronDown
-                          className={cn(
-                            "h-4 w-4 shrink-0 text-white/80 transition-transform duration-200",
-                            showAnnouncementDetails && "rotate-180",
-                          )}
-                        />
-                      </button>
-                    </div>
-                    <div className="max-w-[calc(100%-1rem)] text-white">
-                      <p className="text-sm font-extrabold">@Bodega_Achados</p>
-                      <p className="mt-1 text-xs leading-relaxed text-white/90">
-                        {item.caption} <span className="font-semibold">Veja mais</span>
-                      </p>
-                    </div>
-                  </>
-                )}
-
-                {item.live && (liveComments[item.id]?.length ?? 0) > 0 && (
-                  <div className="max-h-24 space-y-1 overflow-hidden text-xs text-white/90">
-                    {(liveComments[item.id] ?? []).slice(-3).map((comment) => (
-                      <p key={comment.id} className="truncate rounded-full bg-black/30 px-3 py-1">
-                        <strong>{comment.userId === user?.id ? "Você" : "Participante"}:</strong>{" "}
-                        {comment.body}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
-          ))
-        )}
-      </div>
-      {publishOpen && (
-        <div className="absolute inset-0 z-50 overflow-hidden bg-black">
-          <div className="absolute inset-0 bg-black">
-            {!selectedMedia ? (
-              <video
-                ref={cameraVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="h-full w-full object-cover"
-              />
-            ) : selectedMedia.type === "video" ? (
-              <video
-                src={selectedMedia.url}
-                autoPlay
-                playsInline
-                controls
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <img
-                src={selectedMedia.url}
-                alt="Prévia do conteúdo"
-                className="h-full w-full object-cover"
-              />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30" />
-          </div>
-
-          <div className="pointer-events-none absolute inset-0 z-10">
-            <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/55 to-transparent px-4 pb-8 pt-4">
-              <button
-                type="button"
-                aria-label="Fechar criação"
-                onClick={closePublish}
-                className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white backdrop-blur-sm transition hover:bg-black/40"
-              >
-                <X className="h-5 w-5" />
+                {item}
               </button>
-
-              <button
-                type="button"
-                aria-label="Configurações e flash"
-                className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white backdrop-blur-sm transition hover:bg-black/40"
-              >
-                <Zap className="h-5 w-5" />
-              </button>
-            </div>
-
-            {!selectedMedia && (
-              <div className="absolute left-3 top-1/2 flex -translate-y-1/2 flex-col items-center gap-4 rounded-2xl border border-white/10 bg-black/25 p-2 text-white backdrop-blur-sm">
-                {[
-                  { label: "Texto", icon: Type },
-                  { label: "Boomerang", icon: BoomerangIcon },
-                  { label: "Layout", icon: Grid2X2 },
-                  { label: "Efeitos", icon: Sparkles },
-                ].map(({ label, icon: Icon }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    aria-label={label}
-                    className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15"
-                  >
-                    <Icon className="h-5 w-5" />
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  aria-label="Mais ferramentas"
-                  className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+            ))}
           </div>
-
-          {cameraError && !selectedMedia && (
-            <div className="absolute inset-x-4 top-20 z-10 mx-auto max-w-md rounded-2xl border border-white/15 bg-black/45 p-3 text-center text-sm backdrop-blur-sm">
-              <p className="font-medium text-white">{cameraError}</p>
-              <div className="mt-3 flex justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void startCameraStream()}
-                  className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black"
-                >
-                  Tentar novamente
-                </button>
-                <button
-                  type="button"
-                  onClick={openGalleryPicker}
-                  className="rounded-full border border-white/30 px-4 py-2 text-xs font-bold text-white"
-                >
-                  Escolher da galeria
-                </button>
-              </div>
-            </div>
-          )}
-
-          {!selectedMedia ? (
-            <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 via-black/20 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-16">
-              <div className="mb-5 flex justify-center gap-5 overflow-x-auto px-2 text-[11px] font-bold tracking-wide text-white/65">
-                {CAPTURE_MODES.map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => {
-                      setCaptureMode(mode);
-                      setCameraMode(mode === "LIVE" || mode === "REELS" ? "video" : "photo");
-                    }}
-                    className={cn(
-                      "shrink-0 transition",
-                      captureMode === mode &&
-                        "text-white underline decoration-2 underline-offset-4",
-                    )}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-end justify-between">
-                <button
-                  type="button"
-                  onClick={openGalleryPicker}
-                  className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-white/30 bg-black/30 text-white shadow-lg backdrop-blur-sm transition hover:scale-[1.02]"
-                  aria-label="Abrir galeria"
-                >
-                  <img
-                    src={FEED[0].cover}
-                    alt="Miniatura da galeria"
-                    className="h-full w-full object-cover"
-                  />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={cameraMode === "photo" ? capturePhoto : toggleVideoCapture}
-                  aria-label={
-                    cameraMode === "photo"
-                      ? "Capturar foto"
-                      : isRecording
-                        ? "Parar gravação"
-                        : "Gravar vídeo"
-                  }
-                  className={cn(
-                    "flex h-24 w-24 items-center justify-center rounded-full border-4 border-white/80 bg-white text-black shadow-2xl transition active:scale-95",
-                    cameraMode === "video" && "border-primary/80 bg-primary text-white",
-                    isRecording && "border-red-500 bg-red-500 text-white",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "block rounded-full bg-current",
-                      cameraMode === "photo" ? "h-14 w-14" : isRecording ? "h-6 w-6" : "h-12 w-12",
-                    )}
-                  />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={toggleCamera}
-                  aria-label="Alternar câmera frontal e traseira"
-                  className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-black/30 text-white shadow-lg backdrop-blur-sm transition hover:scale-[1.02]"
-                >
-                  <RefreshCw className="h-6 w-6" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6">
-              <div className="space-y-3 rounded-2xl border border-white/10 bg-black/25 p-3 backdrop-blur-sm">
-                <textarea
-                  value={publishCaption}
-                  onChange={(event) => setPublishCaption(event.target.value)}
-                  placeholder="Escreva uma legenda para seu conteúdo..."
-                  className="min-h-[88px] w-full resize-none rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white placeholder:text-white/50 outline-none focus:ring-2 focus:ring-white/60"
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={closePublish}
-                    className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={publishMedia}
-                    className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
-                  >
-                    Publicar
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*"
-            onChange={handleMediaChange}
-            className="hidden"
-          />
         </div>
       )}
-      <nav className="absolute inset-x-0 bottom-0 z-30 border-t border-white/10 bg-black/90 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <ul className="mx-auto flex max-w-md items-stretch">
-          <li className="flex-1">
-            <Link
-              to="/"
-              aria-label="Início"
-              className="flex flex-col items-center gap-0.5 py-1 text-[10px] font-medium text-white/65"
+
+      {/* CABEÇALHO DA ABA LIVES COM BOTÃO VOLTAR */}
+      {isCurrentLiveTab && (
+        <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-3 pt-8 pb-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent pointer-events-none">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate({ to: "/" });
+            }}
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-full text-white/90 hover:text-white hover:bg-white/10 transition active:scale-90 shrink-0 pointer-events-auto",
+              showLiveTabs ? "opacity-100" : "opacity-0 pointer-events-none"
+            )}
+            aria-label="Voltar"
+          >
+            <ChevronLeft className="h-6 w-6 drop-shadow" />
+          </button>
+
+          <div 
+            className={cn(
+              "flex-1 flex justify-center items-center gap-3 transition-opacity duration-300 pointer-events-auto pr-6",
+              showLiveTabs ? "opacity-100" : "opacity-0 pointer-events-none"
+            )}
+          >
+            {TABS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setTab(item);
+                }}
+                className={cn(
+                  "text-[11px] font-bold transition-all whitespace-nowrap drop-shadow",
+                  tab === item ? "text-white underline decoration-primary underline-offset-4" : "text-white/70 hover:text-white",
+                )}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+
+          <div className="absolute right-3 top-3 pointer-events-auto">
+            <span className="inline-flex items-center justify-center rounded-full bg-red-600 px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter text-white shadow-md animate-pulse whitespace-nowrap leading-none">
+              AO VIVO
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* MOEDA FLUTUANTE ARRASTÁVEL COM ANEL DE PROGRESSO */}
+      {!isCurrentLiveTab && (
+        <motion.div
+          drag
+          dragConstraints={containerRef}
+          dragElastic={0.1}
+          onDragStart={() => setIsDraggingCoin(true)}
+          onDragEnd={() => setTimeout(() => setIsDraggingCoin(false), 100)}
+          className="fixed top-20 right-4 z-40 touch-none cursor-grab active:cursor-grabbing"
+        >
+          <div className="relative flex h-11 w-11 items-center justify-center">
+            <svg className="absolute inset-0 h-full w-full -rotate-90 transform" viewBox="0 0 50 50">
+              <circle
+                cx="25"
+                cy="25"
+                r={radius}
+                className="stroke-white/20"
+                strokeWidth="3.5"
+                fill="transparent"
+              />
+              <circle
+                cx="25"
+                cy="25"
+                r={radius}
+                className="stroke-amber-400 transition-all duration-500 ease-out"
+                strokeWidth="3.5"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                fill="transparent"
+              />
+            </svg>
+
+            <button
+              type="button"
+              className="relative flex h-8 w-8 items-center justify-center active:scale-95 transition-transform"
+              aria-label="Oxente Coin"
             >
-              <Home className="h-5 w-5" />
-              <span className="leading-none">Início</span>
-            </Link>
-          </li>
-          <li className="flex-1">
-            <Link
-              to="/oficiais"
-              aria-label="Oficiais"
-              className="flex flex-col items-center gap-0.5 py-1 text-[10px] font-medium text-white/65"
-            >
-              <BadgeCheck className="h-5 w-5" />
-              <span className="leading-none">Oficiais</span>
-            </Link>
-          </li>
-          <li className="flex-1">
-            <Link
-              to="/live"
-              aria-label="Bodega"
-              className="flex flex-col items-center gap-0.5 py-1 text-[10px] font-medium text-white"
-            >
-              <PlaySquare className="h-5 w-5" />
-              <span className="leading-none">Bodega</span>
-            </Link>
-          </li>
-          <li className="flex-1">
-            <Link
-              to="/notificacoes"
-              aria-label="Notificações"
-              className="flex flex-col items-center gap-0.5 py-1 text-[10px] font-medium text-white/65"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="leading-none">Notificações</span>
-            </Link>
-          </li>
-          <li className="flex-1">
-            <Link
-              to="/eu"
-              aria-label="Eu"
-              className="flex flex-col items-center gap-0.5 py-1 text-[10px] font-medium text-white/65"
-            >
-              <User className="h-5 w-5" />
-              <span className="leading-none">Eu</span>
-            </Link>
-          </li>
-        </ul>
-      </nav>
+              <img
+                src="/oxente-coin.png"
+                alt="Oxente Coin"
+                className="h-7 w-7 object-contain drop-shadow-md pointer-events-none"
+              />
+            </button>
+
+            <AnimatePresence>
+              {floatingCoinRewards.map((reward) => (
+                <span
+                  key={reward.id}
+                  className="absolute -top-6 left-1/2 -translate-x-1/2 pointer-events-none select-none text-[11px] font-black text-amber-300 drop-shadow-md animate-coin-reward whitespace-nowrap"
+                >
+                  +100 🪙
+                </span>
+              ))}
+            </AnimatePresence>
+          </div>
+        </motion.div>
+      )}
+
+      {/* FEED DE VÍDEOS E LIVES */}
+      <div className="mx-auto h-full max-w-md snap-y snap-mandatory overflow-y-auto overscroll-y-contain touch-pan-y [-webkit-overflow-scrolling:touch]">
+        {visibleFeed.length === 0 ? (
+          <div className="flex h-full items-center justify-center px-8 text-center">
+            <p className="text-base font-bold text-white">Nenhum conteúdo nesta aba no momento.</p>
+          </div>
+        ) : (
+          visibleFeed.map((item) => {
+            const isFollowed = followedStores.includes(item.storeSlug);
+            return (
+              <section
+                key={item.id}
+                className="relative flex h-[100svh] min-h-[100svh] snap-start items-end overflow-hidden"
+              >
+                {item.videoUrl ? (
+                  <video
+                    src={item.videoUrl}
+                    poster={item.cover}
+                    muted
+                    autoPlay
+                    loop
+                    playsInline
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                ) : (
+                  <img
+                    src={item.cover}
+                    alt={item.store}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/30" />
+
+                {/* CORAÇÕES FLUTUANTES */}
+                <div className="absolute right-6 bottom-20 z-30 pointer-events-none">
+                  {floatingHearts.map((heart) => (
+                    <div
+                      key={heart.id}
+                      style={{ right: `${heart.left}px` }}
+                      className="absolute bottom-0 text-primary animate-float-up"
+                    >
+                      <Heart className="h-7 w-7 fill-primary" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* BARRA DE AÇÕES LATERAL DIREITA DOS VÍDEOS */}
+                {!item.live && (
+                  <div className="absolute right-3 bottom-24 z-20 flex flex-col items-center gap-3.5 text-white">
+                    {/* FOTO DO PERFIL COM BOTÃO DE SEGUIR (+ / V) ACIMA DO CORAÇÃO */}
+                    <div className="relative mb-1">
+                      <div className="h-11 w-11 rounded-full overflow-hidden border-2 border-white shadow-md bg-zinc-800">
+                        <img src={item.avatar} alt={item.store} className="h-full w-full object-cover" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleFollow(item.storeSlug)}
+                        className={cn(
+                          "absolute -bottom-2 left-1/2 -translate-x-1/2 flex h-5 w-5 items-center justify-center rounded-full text-white shadow transition-transform active:scale-95",
+                          isFollowed ? "bg-emerald-600" : "bg-primary"
+                        )}
+                        aria-label="Seguir perfil"
+                      >
+                        {isFollowed ? <Check className="h-3 w-3 stroke-[3]" /> : <Plus className="h-3.5 w-3.5 stroke-[3]" />}
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="flex flex-col items-center gap-0.5 group"
+                      onClick={() => toggleLike(item.id)}
+                    >
+                      <div className="p-2 rounded-full bg-black/30 backdrop-blur-sm group-hover:bg-black/50 transition">
+                        <Heart
+                          className={cn(
+                            "h-6 w-6 transition transform active:scale-125",
+                            likedItems.includes(item.id) && "fill-primary text-primary",
+                          )}
+                        />
+                      </div>
+                      <span className="text-[11px] font-bold">{likeCounts[item.id] ?? 0}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="flex flex-col items-center gap-0.5 group"
+                      onClick={() => openCommentsModal(item.id)}
+                    >
+                      <div className="p-2 rounded-full bg-black/30 backdrop-blur-sm group-hover:bg-black/50 transition">
+                        <MessageCircle className="h-6 w-6" />
+                      </div>
+                      <span className="text-[11px] font-bold">{commentCounts[item.id] ?? 41}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="flex flex-col items-center gap-0.5 group"
+                      onClick={() => openShareDrawer(item)}
+                    >
+                      <div className="p-2 rounded-full bg-black/30 backdrop-blur-sm group-hover:bg-black/50 transition">
+                        <Share2 className="h-6 w-6" />
+                      </div>
+                      <span className="text-[11px] font-bold">{shareCounts[item.id] ?? 0}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* CONTEÚDO DA BASE NA ABA VÍDEOS */}
+                <div className={cn("relative z-20 w-full p-3 space-y-2", !item.live ? "pb-16" : "pb-3")}>
+                  {!item.live ? (
+                    <div className="pr-16 space-y-2">
+                      <div className="relative z-40 mb-1.5 w-[85%] overflow-hidden rounded-xl shadow-lg border border-white/15 bg-black/60 backdrop-blur-md">
+                        {showAnnouncementDetails && (
+                          <div className="p-2 bg-zinc-900/95 animate-in fade-in duration-300">
+                            <div className="flex items-center gap-2.5">
+                              <img
+                                src={item.cover}
+                                alt={item.product?.name}
+                                className="h-12 w-12 shrink-0 rounded-lg object-cover border border-white/10"
+                              />
+                              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <p className="line-clamp-1 text-[11px] font-bold text-white">
+                                  {item.product?.name}
+                                </p>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="rounded bg-primary px-1 py-0.2 text-[9px] font-extrabold text-primary-foreground">
+                                    Oferta
+                                  </span>
+                                  <span className="text-[9px] text-emerald-400 font-semibold">Frete grátis</span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-xs font-black text-primary">
+                                    {formatBRL(item.product?.price || 0)}
+                                  </span>
+                                  <span className="flex items-center gap-0.5 text-[9px] text-amber-300">
+                                    <Star className="h-2.5 w-2.5 fill-amber-300" /> 4,8
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="mt-1 flex w-full items-center justify-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-bold text-primary-foreground shadow"
+                                >
+                                  <ShoppingCart className="h-3 w-3" />
+                                  Comprar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <button
+                          type="button"
+                          onClick={() => setShowAnnouncementDetails((current) => !current)}
+                          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-[11px] font-bold text-white transition"
+                        >
+                          <img src="/so-logo-bolsa.png" alt="" className="h-4 w-4 shrink-0 object-contain" />
+                          <span className="min-w-0 flex-1 truncate text-left">
+                            R$10 de desconto | Oferta da Bodega
+                          </span>
+                          <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-white transition-transform", showAnnouncementDetails && "rotate-180")} />
+                        </button>
+                      </div>
+
+                      <div className="max-w-[calc(100%-1rem)] text-white">
+                        <p className="text-xs font-black drop-shadow tracking-wide">
+                          @{item.store.toLowerCase().replace(/\s+/g, '_')}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-snug text-white/90 drop-shadow line-clamp-2">
+                          {item.caption}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    /* SE FOR LIVE */
+                    <div className="space-y-2">
+                      <div className="flex flex-col gap-1 max-h-24 overflow-y-auto scrollbar-none pr-2 text-[10px]">
+                        {(commentsMap[item.id] ?? []).slice(-3).map((comment) => (
+                          <div
+                            key={comment.id}
+                            className="inline-flex max-w-[65%] items-center gap-1 rounded-lg bg-black/30 px-2.5 py-1 text-white/90 backdrop-blur-sm border border-white/5 shadow-xs"
+                          >
+                            <span className="font-bold text-primary shrink-0 leading-tight">{comment.name}:</span>
+                            <span className="break-words font-normal leading-tight text-white/95">{comment.body}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleSendLiveComment(item.id);
+                          }}
+                          className="flex flex-1 items-center gap-2 rounded-full border border-white/20 bg-black/40 p-1 pl-3 backdrop-blur-md shadow-md"
+                        >
+                          <input
+                            type="text"
+                            value={liveInputText}
+                            onChange={(e) => setLiveInputText(e.target.value)}
+                            placeholder="Comente na live..."
+                            className="min-w-0 flex-1 bg-transparent text-[11px] text-white placeholder:text-white/60 outline-none"
+                          />
+                          <button
+                            type="submit"
+                            aria-label="Enviar"
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow transition active:scale-90 shrink-0"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                          </button>
+                        </form>
+
+                        <button
+                          type="button"
+                          aria-label="Curtir"
+                          className="flex flex-col items-center group active:scale-125 transition-transform shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            triggerMultipleLikes(item.id);
+                          }}
+                        >
+                          <div className="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/20 group-hover:bg-black/60 transition shadow-md">
+                            <Heart className="h-5 w-5 text-primary fill-primary" />
+                          </div>
+                          <span className="text-[9px] font-extrabold drop-shadow mt-0.5">{likeCounts[item.id] ?? 0}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            );
+          })
+        )}
+      </div>
+
+      {/* GAVETA DE COMENTÁRIOS DOS VÍDEOS */}
+      {commentsModalOpen && (
+        <div className="absolute inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative flex h-[65%] w-full flex-col rounded-t-3xl bg-zinc-900 px-4 pt-3 pb-4 text-white shadow-2xl border-t border-white/10 animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+              <span className="text-xs font-bold text-white/90">
+                {commentCounts[selectedVideoId] ?? 0} comentários
+              </span>
+              <button
+                type="button"
+                onClick={() => setCommentsModalOpen(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-3 space-y-3.5 scrollbar-thin">
+              {(commentsMap[selectedVideoId] ?? []).length === 0 ? (
+                <div className="flex h-full items-center justify-center text-xs text-white/50">
+                  Seja o primeiro a comentar!
+                </div>
+              ) : (
+                (commentsMap[selectedVideoId] ?? []).map((c) => (
+                  <div key={c.id} className="flex items-start gap-2.5 text-xs">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[10px] font-black text-primary border border-primary/30">
+                      {c.name.slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white/90 text-[11px]">{c.name}</span>
+                        <span className="text-[9px] text-white/40">{c.time}</span>
+                      </div>
+                      <p className="text-[11px] text-white/80 leading-relaxed break-words">{c.body}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex items-center justify-around py-1.5 border-t border-white/10 bg-zinc-900/90">
+              {EMOJI_LIST.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => setVideoInputText((prev) => prev + emoji)}
+                  className="text-base hover:scale-125 transition-transform p-1"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
+            <form onSubmit={handleSendVideoComment} className="mt-1 flex items-center gap-2">
+              <input
+                type="text"
+                value={videoInputText}
+                onChange={(e) => setVideoInputText(e.target.value)}
+                placeholder="Adicione um comentário..."
+                className="flex-1 rounded-full border border-white/15 bg-zinc-800 px-3.5 py-2 text-xs text-white placeholder:text-white/40 outline-none focus:border-primary transition"
+              />
+              <button
+                type="submit"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow transition active:scale-90 shrink-0"
+              >
+                <Send className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* GAVETA DE COMPARTILHAMENTO */}
+      {shareModalOpen && (
+        <div className="absolute inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative flex w-full flex-col rounded-t-3xl bg-zinc-900 px-4 pt-3 pb-6 text-white shadow-2xl border-t border-white/10 animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <span className="text-xs font-bold text-white/90">
+                Compartilhar este vídeo
+              </span>
+              <button
+                type="button"
+                onClick={() => setShareModalOpen(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-4 py-5 text-center">
+              <button
+                type="button"
+                onClick={() => handleSharePlatform("whatsapp")}
+                className="flex flex-col items-center gap-2 group"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg group-hover:scale-105 transition-transform">
+                  <Share2 className="h-6 w-6" />
+                </div>
+                <span className="text-[10px] font-semibold text-white/80">WhatsApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="flex flex-col items-center gap-2 group"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-700 text-white shadow-lg group-hover:scale-105 transition-transform">
+                  <Copy className="h-6 w-6" />
+                </div>
+                <span className="text-[10px] font-semibold text-white/80">Copiar Link</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSharePlatform("facebook")}
+                className="flex flex-col items-center gap-2 group"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg group-hover:scale-105 transition-transform">
+                  <Share2 className="h-6 w-6" />
+                </div>
+                <span className="text-[10px] font-semibold text-white/80">Facebook</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSharePlatform("native")}
+                className="flex flex-col items-center gap-2 group"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg group-hover:scale-105 transition-transform">
+                  <MoreHorizontal className="h-6 w-6" />
+                </div>
+                <span className="text-[10px] font-semibold text-white/80">Outros</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BARRA DE NAVEGAÇÃO INFERIOR */}
+      {!isCurrentLiveTab && (
+        <nav className="absolute inset-x-0 bottom-0 z-30 border-t border-white/10 bg-black/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md">
+          <ul className="mx-auto flex max-w-md items-stretch">
+            <li className="flex-1">
+              <Link to="/" className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-white/65 hover:text-white transition">
+                <Home className="h-5 w-5" />
+                <span className="leading-none">Início</span>
+              </Link>
+            </li>
+            <li className="flex-1">
+              <Link to="/oficiais" className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-white/65 hover:text-white transition">
+                <BadgeCheck className="h-5 w-5" />
+                <span className="leading-none">Oficiais</span>
+              </Link>
+            </li>
+            <li className="flex-1">
+              <Link to="/live" className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-white hover:text-white transition">
+                <PlaySquare className="h-5 w-5 text-primary" />
+                <span className="leading-none font-bold">Bodega</span>
+              </Link>
+            </li>
+            <li className="flex-1">
+              <Link to="/notificacoes" className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-white/65 hover:text-white transition">
+                <Bell className="h-5 w-5" />
+                <span className="leading-none">Notificações</span>
+              </Link>
+            </li>
+            <li className="flex-1">
+              <Link to="/eu" className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-white/65 hover:text-white transition">
+                <User className="h-5 w-5" />
+                <span className="leading-none">Eu</span>
+              </Link>
+            </li>
+          </ul>
+        </nav>
+      )}
     </div>
   );
 }

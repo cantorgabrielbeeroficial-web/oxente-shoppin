@@ -58,16 +58,18 @@ function CartPage() {
 
   if (cart.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <ShoppingBag className="mx-auto h-10 w-10 text-muted-foreground" />
-        <h1 className="mt-4 text-xl font-bold text-foreground">
-          Vixe, teu carrinho tá só o bagaço de vazio!
+      <div className="mx-auto flex min-h-[60vh] max-w-3xl flex-col items-center justify-center px-4 py-16 text-center">
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10">
+          <ShoppingBag className="h-12 w-12 text-primary" />
+        </div>
+        <h1 className="mt-6 text-xl font-bold text-foreground">
+          Oxente, seu carrinho está vazio!
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Cuida nas ofertas e encontre algo arretado.
+          Vixe, tá só o bagaço! Bora dar uma espiada nas ofertas e achar algo arretado.
         </p>
-        <Button asChild className="mt-6">
-          <Link to="/">Ver produtos</Link>
+        <Button asChild size="lg" className="mt-6 h-12 w-full max-w-xs">
+          <Link to="/">Bora voltar às compras</Link>
         </Button>
       </div>
     );
@@ -88,7 +90,7 @@ function CartPage() {
   const total = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-6 pb-60 md:py-8 md:pb-8">
       <h1 className="text-xl font-bold text-foreground">Meu carrinho</h1>
 
       <div className="mt-4 space-y-4">
@@ -133,11 +135,12 @@ function CartPage() {
                       {item.product.name}
                     </Link>
                     <p className="mt-1 font-bold text-primary">{formatBRL(item.product.price)}</p>
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center rounded-md border border-border">
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-11 w-11"
                           aria-label="Diminuir"
                           disabled={mutation.isPending}
                           onClick={() =>
@@ -153,6 +156,7 @@ function CartPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-11 w-11"
                           aria-label="Aumentar"
                           disabled={mutation.isPending || item.quantity >= item.product.stock}
                           onClick={() =>
@@ -165,7 +169,8 @@ function CartPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-destructive"
+                        className="h-11 min-w-11 text-destructive"
+                        aria-label="Remover item"
                         onClick={() => mutation.mutate({ itemId: item.id, quantity: 0 })}
                       >
                         <Trash2 className="mr-1 h-4 w-4" />
@@ -173,7 +178,7 @@ function CartPage() {
                       </Button>
                     </div>
                   </div>
-                  <p className="text-sm font-semibold text-card-foreground">
+                  <p className="hidden text-sm font-semibold text-card-foreground sm:block">
                     {formatBRL(item.product.price * item.quantity)}
                   </p>
                 </li>
@@ -183,14 +188,31 @@ function CartPage() {
         ))}
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">
-        <div>
-          <p className="text-sm text-muted-foreground">Total do pedido</p>
-          <p className="text-2xl font-extrabold text-primary">{formatBRL(total)}</p>
+      <div className="fixed inset-x-0 bottom-[3.25rem] z-30 border-t border-border bg-card/95 p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] backdrop-blur md:static md:mt-6 md:rounded-lg md:border md:p-4 md:shadow-none">
+        <div className="mx-auto flex max-w-5xl flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4">
+          <dl className="space-y-0.5 text-sm">
+            <div className="flex justify-between gap-6 text-muted-foreground">
+              <dt>Subtotal</dt>
+              <dd>{formatBRL(total)}</dd>
+            </div>
+            <div className="flex justify-between gap-6 text-muted-foreground">
+              <dt>Frete</dt>
+              <dd>A gente calcula no checkout</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-6">
+              <dt className="font-medium text-card-foreground">Total</dt>
+              <dd className="text-xl font-extrabold text-primary">{formatBRL(total)}</dd>
+            </div>
+          </dl>
+          <Button
+            size="lg"
+            className="h-auto min-h-12 w-full flex-col gap-0 py-2 leading-tight md:w-auto"
+            onClick={() => navigate({ to: "/checkout" })}
+          >
+            <span className="text-base font-bold">Arrocha o nó cuida</span>
+            <span className="text-xs font-normal opacity-90">Concluir compra</span>
+          </Button>
         </div>
-        <Button size="lg" onClick={() => navigate({ to: "/checkout" })}>
-          Arroxa o nó e concluir compra
-        </Button>
       </div>
     </div>
   );

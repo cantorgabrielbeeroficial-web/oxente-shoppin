@@ -1,10 +1,15 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Store } from "lucide-react";
 import { formatBRL } from "@/lib/format";
 import { isVideoUrl } from "@/lib/media";
+import { productImageUrl } from "@/lib/product-media";
 import type { ProductListItem } from "@/lib/types";
 
 export function ProductCard({ product }: { product: ProductListItem }) {
+  const [mediaFailed, setMediaFailed] = useState(false);
+  const imageUrl = productImageUrl(product);
+
   return (
     <Link
       to="/produto/$id"
@@ -12,22 +17,24 @@ export function ProductCard({ product }: { product: ProductListItem }) {
       className="group flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-shadow hover:shadow-lg"
     >
       <div className="aspect-square overflow-hidden bg-muted">
-        {product.image_url ? (
-          isVideoUrl(product.image_url) ? (
+        {imageUrl && !mediaFailed ? (
+          isVideoUrl(imageUrl) ? (
             <video
-              src={product.image_url}
+              src={imageUrl}
               autoPlay
               loop
               muted
               playsInline
               preload="metadata"
+              onError={() => setMediaFailed(true)}
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
             <img
-              src={product.image_url}
+              src={imageUrl}
               alt={product.name}
               loading="lazy"
+              onError={() => setMediaFailed(true)}
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
           )

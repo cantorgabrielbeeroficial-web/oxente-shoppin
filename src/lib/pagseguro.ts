@@ -5,6 +5,19 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const PAGBANK_ORDERS_URL = "https://api.pagseguro.com/orders";
 const PAGBANK_CHECKOUTS_URL = "https://api.pagseguro.com/checkouts";
 
+/**
+ * Log de evidência para homologação PagBank: imprime a requisição e a resposta
+ * (com token e dados sensíveis mascarados) para anexar ao e-mail do processo.
+ */
+function logPagBankEvidence(label: string, request: unknown, status: number, response: unknown): void {
+  console.log(`\n===== PAGBANK EVIDENCE :: ${label} =====`);
+  console.log("--- REQUEST ---");
+  console.log(JSON.stringify(request, null, 2));
+  console.log(`--- RESPONSE (HTTP ${status}) ---`);
+  console.log(JSON.stringify(response, null, 2));
+  console.log(`===== PAGBANK EVIDENCE END =====\n`);
+}
+
 export type PagSeguroCustomer = {
   name: string;
   email: string;
@@ -101,6 +114,7 @@ async function createPagSeguroPixOrderRequest(
   });
 
   const responseBody: unknown = await response.json().catch(() => null);
+  logPagBankEvidence("PIX /orders", payload, response.status, responseBody);
   if (!response.ok) {
     const message =
       typeof responseBody === "object" && responseBody !== null && "error_messages" in responseBody
@@ -147,6 +161,29 @@ async function createPagSeguroHostedCheckoutRequest(
   const appUrl = process.env["APP_URL"] ?? process.env["VITE_APP_URL"];
   if (!appUrl) throw new Error("APP_URL não configurado para o checkout PagBank.");
 
+  const checkoutPayload = {
+    reference_id: input.orderId,
+    customer,
+    customer_modifiable: false,
+    items: [
+      {
+        reference_id: input.orderId,
+        name: `Pedido ${input.orderId}`,
+        quantity: 1,
+        unit_amount: amount,
+      },
+    ],
+    payment_methods: [
+      { type: "CREDIT_CARD" },
+      { type: "DEBIT_CARD" },
+      { type: "PIX" },
+    ],
+    return_url: `${appUrl}/pedidos`,
+    redirect_url: `${appUrl}/pedidos`,
+    notification_urls: [`${appUrl}/api/webhooks/pagseguro`],
+    payment_notification_urls: [`${appUrl}/api/webhooks/pagseguro`],
+  };
+
   const response = await fetch(PAGBANK_CHECKOUTS_URL, {
     method: "POST",
     headers: {
@@ -155,31 +192,11 @@ async function createPagSeguroHostedCheckoutRequest(
       Accept: "application/json",
       "x-idempotency-key": `${input.orderId}-checkout`,
     },
-    body: JSON.stringify({
-      reference_id: input.orderId,
-      customer,
-      customer_modifiable: false,
-      items: [
-        {
-          reference_id: input.orderId,
-          name: `Pedido ${input.orderId}`,
-          quantity: 1,
-          unit_amount: amount,
-        },
-      ],
-      payment_methods: [
-        { type: "CREDIT_CARD" },
-        { type: "DEBIT_CARD" },
-        { type: "PIX" },
-      ],
-      return_url: `${appUrl}/pedidos`,
-      redirect_url: `${appUrl}/pedidos`,
-      notification_urls: [`${appUrl}/api/webhooks/pagseguro`],
-      payment_notification_urls: [`${appUrl}/api/webhooks/pagseguro`],
-    }),
+    body: JSON.stringify(checkoutPayload),
   });
 
   const responseBody: unknown = await response.json().catch(() => null);
+  logPagBankEvidence("Checkout /checkouts", checkoutPayload, response.status, responseBody);
   if (!response.ok) {
     const message =
       typeof responseBody === "object" && responseBody !== null && "error_messages" in responseBody

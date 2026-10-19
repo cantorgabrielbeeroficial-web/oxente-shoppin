@@ -1,7 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+﻿import { createFileRoute, Link } from "@tanstack/react-router";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import {
   ShieldCheck,
   Truck,
@@ -19,28 +17,14 @@ import {
   BadgeCheck,
   ChevronRight,
   Play,
-  Star,
-  ShoppingCart,
 } from "lucide-react";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
-import { addToCart } from "@/lib/shop.functions";
-import { useAuthUser } from "@/hooks/use-auth";
 import { formatBRL } from "@/lib/format";
 import { BannerCarousel } from "@/components/banner-carousel";
 import { MobileSearchBar } from "@/components/mobile-search-bar";
 import { PromoCarousel } from "@/components/promo-carousel";
-import { ProductGrid } from "@/components/product-card";
-import coinIcon from "@/assets/oxente-coin.png";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { ProductCard } from "@/components/product-card";
+const coinIcon = "/oxente-coin.png";
 
 const categoriesQuery = queryOptions({
   queryKey: ["categories"],
@@ -50,12 +34,12 @@ const categoriesQuery = queryOptions({
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Oxente — Marketplace" },
+      { title: "Oxente â€” Marketplace" },
       {
         name: "description",
         content: "Marketplace nordestino com lojas, produtos e achados especiais.",
       },
-      { property: "og:title", content: "Oxente — Marketplace" },
+      { property: "og:title", content: "Oxente â€” Marketplace" },
       {
         property: "og:description",
         content: "Lojas e produtos selecionados para comprar no Oxente.",
@@ -83,36 +67,14 @@ const CATEGORY_ICONS: Record<string, any> = {
   esporte: Trophy,
 };
 
-const FAKE_OFFICIAL_PRODUCT = {
-  store: "Oxente Oficial",
-  name: "Bolsa oficial Oxente em lona resistente",
-  description:
-    "Escolha o acabamento ideal para sua rotina. As opções mudam conforme o produto cadastrado pela loja.",
-  image: "/so-logo-bolsa.png",
-  price: "R$ 89,90",
-  options: {
-    tipo: ["Alça curta", "Transversal"],
-    cor: ["Crua", "Barro", "Preta"],
-    tamanho: ["P", "M", "G"],
-    espessura: ["Leve", "Reforçada"],
-  },
-};
-
-type OfficialOption = keyof typeof FAKE_OFFICIAL_PRODUCT.options;
-
 function Home() {
-  const navigate = Route.useNavigate();
-  const queryClient = useQueryClient();
-  const { user } = useAuthUser();
-  const add = useServerFn(addToCart);
   const { data: categories = [] } = useQuery({
     ...categoriesQuery,
     enabled: typeof window !== "undefined",
   });
   const { data: testProducts = [] } = useQuery({
     queryKey: ["home-test-product"],
-    queryFn: () =>
-      listProducts({ data: { search: "Fone de Ouvido Bluetooth Sem Fio", limit: 1 } }),
+    queryFn: () => listProducts({ data: { search: "Fone de Ouvido Bluetooth Sem Fio", limit: 1 } }),
     enabled: typeof window !== "undefined",
   });
   const { data: officialProducts = [] } = useQuery({
@@ -126,35 +88,18 @@ function Home() {
     enabled: typeof window !== "undefined",
   });
   const testProduct = testProducts[0];
-  const buyTestProduct = useMutation({
-    mutationFn: async () => {
-      if (!testProduct) throw new Error("Produto de teste indisponível.");
-      return add({ data: { productId: testProduct.id, quantity: 1 } });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cart"] });
-      queryClient.invalidateQueries({ queryKey: ["cart-count"] });
-      navigate({ to: "/checkout" });
-    },
-    onError: () => toast.error("Não foi possível preparar o pagamento deste produto."),
-  });
-  const [officialOpen, setOfficialOpen] = useState(false);
-  const [selectedOptions, setSelectedOptions] = useState<Record<OfficialOption, string>>({
-    tipo: FAKE_OFFICIAL_PRODUCT.options.tipo[0] ?? "",
-    cor: FAKE_OFFICIAL_PRODUCT.options.cor[0] ?? "",
-    tamanho:
-      FAKE_OFFICIAL_PRODUCT.options.tamanho[1] ?? FAKE_OFFICIAL_PRODUCT.options.tamanho[0] ?? "",
-    espessura:
-      FAKE_OFFICIAL_PRODUCT.options.espessura[1] ??
-      FAKE_OFFICIAL_PRODUCT.options.espessura[0] ??
-      "",
-  });
+  const featuredProducts = [
+    ...(testProduct ? [testProduct] : []),
+    ...[...bodegaProducts, ...officialProducts].filter((product) => product.id !== testProduct?.id),
+  ];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
       <section className="relative -mx-4 -mt-6 overflow-hidden lg:mx-0 lg:mt-0">
+        <div className="bg-primary px-3 pb-2 pt-2 sm:hidden">
+          <MobileSearchBar />
+        </div>
         <BannerCarousel />
-        <MobileSearchBar className="absolute inset-x-3 top-2 z-30 sm:hidden" />
       </section>
 
       <section className="-mx-4 mt-1 flex items-start gap-1 overflow-x-auto px-4 pb-1 md:mx-0 md:mt-6 md:grid md:grid-cols-6 md:gap-1 md:rounded-xl md:border md:border-border md:bg-card md:p-2">
@@ -200,84 +145,68 @@ function Home() {
         <PromoCarousel />
       </section>
 
-      {testProduct && (
-        <section className="mt-6 rounded-xl border-2 border-brand-gold/50 bg-brand-gold-soft p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wide text-brand-gold-foreground">
-                Produto de teste
+      <section className="-mx-4 mt-4 bg-card px-2 pb-4 pt-3 sm:mx-0 sm:rounded-xl sm:border sm:border-border sm:px-4">
+        <div className="flex items-end justify-between gap-3 px-1">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Da Bodega pra tua casa
+            </span>
+            <h2 className="mt-0.5 text-lg font-bold text-foreground">Achadinhos de hoje</h2>
+          </div>
+          <Link to="/buscar" className="text-xs font-semibold text-primary hover:underline">
+            Ver tudo
+          </Link>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
+          <Link
+            to="/live"
+            className="group flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-sm transition-shadow hover:shadow-lg"
+            aria-label="Assistir vÃ­deo de afiliada na aba VÃ­deos"
+          >
+            <div className="relative aspect-square overflow-hidden bg-muted">
+              <video
+                src="/video-teste.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/15" />
+              <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[10px] font-bold text-white">
+                <Play className="h-3 w-3 fill-current" />
+                VÃ­deo de afiliada
               </span>
-              <h2 className="mt-1 text-lg font-bold text-card-foreground">
-                Fone Bluetooth por {formatBRL(testProduct.price)}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Teste o fluxo completo: carrinho, checkout e pagamento Pix.
+              <span className="absolute bottom-2 left-2 flex items-center gap-1 text-[10px] font-semibold text-white">
+                <PlaySquare className="h-3.5 w-3.5" />
+                Ver na Bodega
+              </span>
+            </div>
+            <div className="flex flex-1 flex-col gap-1 p-2 sm:p-3">
+              <h3 className="line-clamp-2 text-xs font-semibold leading-tight text-card-foreground sm:text-sm">
+                Vestido de botÃ£o longo, visse que achado!
+              </h3>
+              <p className="mt-auto text-base font-bold text-primary sm:text-lg">
+                {formatBRL(249)}
+              </p>
+              <p className="truncate text-[10px] text-muted-foreground sm:text-xs">
+                Raquel Santos Â· Afiliada
               </p>
             </div>
-            <Button
-              type="button"
-              disabled={testProduct.stock <= 0 || buyTestProduct.isPending}
-              onClick={() => {
-                if (!user) {
-                  toast.info("Entre na sua conta para comprar.");
-                  navigate({ to: "/entrar" });
-                  return;
-                }
-                buyTestProduct.mutate();
-              }}
-            >
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              {testProduct.stock > 0 ? "Comprar por Pix" : "Esgotado"}
-            </Button>
-          </div>
-        </section>
-      )}
+          </Link>
 
-      {officialProducts.length > 0 && (
-        <section className="mt-8">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wide text-primary">
-                Loja oficial
-              </span>
-              <h2 className="mt-1 text-lg font-bold text-foreground">Produtos oficiais</h2>
-            </div>
-            <Link
-              to="/oficiais"
-              className="text-xs font-semibold text-primary hover:underline"
-            >
-              Ver todos
-            </Link>
-          </div>
-          <div className="mt-3">
-            <ProductGrid products={officialProducts} />
-          </div>
-        </section>
-      )}
-
-      {bodegaProducts.length > 0 && (
-        <section className="mt-8">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wide text-primary">
-                Lojas parceiras
-              </span>
-              <h2 className="mt-1 text-lg font-bold text-foreground">Achados das lojas</h2>
-            </div>
-            <Link to="/buscar" className="text-xs font-semibold text-primary hover:underline">
-              Ver todos
-            </Link>
-          </div>
-          <div className="mt-3">
-            <ProductGrid products={bodegaProducts} />
-          </div>
-        </section>
-      )}
+          {featuredProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      </section>
 
       <section className="mt-1 hidden gap-2 sm:grid sm:grid-cols-3 sm:gap-3">
         {[
-          { icon: ShieldCheck, title: "Compra protegida", text: "Acompanhada do início ao fim." },
-          { icon: Truck, title: "Todo Brasil", text: "Lojas de várias regiões." },
+          { icon: ShieldCheck, title: "Compra protegida", text: "Acompanhada do inÃ­cio ao fim." },
+          { icon: Truck, title: "Todo Brasil", text: "Lojas de vÃ¡rias regiÃµes." },
           { icon: StoreIcon, title: "Lojas independentes", text: "Vendedores aprovados." },
         ].map((item) => (
           <div
@@ -318,150 +247,6 @@ function Home() {
             );
           })}
         </div>
-      </section>
-
-      <Dialog open={officialOpen} onOpenChange={setOfficialOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
-          <DialogHeader className="text-left">
-            <DialogTitle>Personalize seu produto</DialogTitle>
-            <DialogDescription>{FAKE_OFFICIAL_PRODUCT.description}</DialogDescription>
-          </DialogHeader>
-          <div className="overflow-hidden rounded-xl bg-muted">
-            <img
-              src={FAKE_OFFICIAL_PRODUCT.image}
-              alt={FAKE_OFFICIAL_PRODUCT.name}
-              className="aspect-video w-full object-cover"
-            />
-          </div>
-          <div className="space-y-4">
-            {(Object.entries(FAKE_OFFICIAL_PRODUCT.options) as [OfficialOption, string[]][]).map(
-              ([name, options]) => (
-                <fieldset key={name}>
-                  <legend className="mb-2 text-sm font-semibold capitalize text-foreground">
-                    {name}
-                  </legend>
-                  <div className="flex flex-wrap gap-2">
-                    {options.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() =>
-                          setSelectedOptions((current) => ({ ...current, [name]: option }))
-                        }
-                        className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${selectedOptions[name] === option ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-card-foreground hover:border-primary"}`}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-              ),
-            )}
-          </div>
-          <DialogFooter className="flex-row items-center justify-between gap-3 sm:justify-between">
-            <span className="text-lg font-bold text-primary">{FAKE_OFFICIAL_PRODUCT.price}</span>
-            <Button type="button" onClick={() => setOfficialOpen(false)}>
-              Continuar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <section className="-mx-4 mt-8 grid grid-cols-2 gap-2 sm:mx-0 sm:mt-12 sm:gap-5">
-        <Link
-          to="/live"
-          className="group min-w-0 overflow-hidden rounded-none border-y border-border bg-card shadow-sm transition-shadow hover:shadow-lg sm:rounded-xl sm:border"
-        >
-          <div className="relative aspect-[0.82] w-full overflow-hidden bg-muted sm:aspect-square">
-            <video
-              src="/video-teste.mp4"
-              autoPlay
-              loop
-              muted
-              playsInline
-              preload="metadata"
-              className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-            <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold text-white">
-              <Play className="h-3 w-3 fill-current" /> Vídeo
-            </span>
-          </div>
-          <div className="space-y-2 p-3 sm:p-4">
-            <h2 className="line-clamp-2 text-sm font-bold leading-tight text-card-foreground sm:text-base">
-              Caneca artesanal com estampa nordestina
-            </h2>
-            <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              Um achado cheio de personalidade para deixar seu café mais especial e levar um
-              pedacinho do Nordeste para casa.
-            </p>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-base font-bold text-primary sm:text-lg">R$ 39,90</span>
-              <span className="flex items-center gap-1 text-[10px] text-muted-foreground sm:text-xs">
-                <Star className="h-3 w-3 fill-brand-gold text-brand-gold" /> 4,9
-              </span>
-            </div>
-            <span className="block text-[10px] text-muted-foreground sm:text-xs">
-              1,2 mil vendidos
-            </span>
-          </div>
-        </Link>
-
-        <button
-          type="button"
-          onClick={() => setOfficialOpen(true)}
-          className="group min-w-0 overflow-hidden rounded-none border-y border-border bg-card text-left shadow-sm transition-shadow hover:shadow-lg sm:rounded-xl sm:border"
-        >
-          <div className="relative aspect-[0.82] w-full overflow-hidden bg-brand-orange-soft sm:aspect-square">
-            <img
-              src={FAKE_OFFICIAL_PRODUCT.image}
-              alt={FAKE_OFFICIAL_PRODUCT.name}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-          </div>
-          <div className="space-y-2 p-3 sm:p-4">
-            <h2 className="line-clamp-2 text-sm font-bold leading-tight text-card-foreground sm:text-base">
-              {FAKE_OFFICIAL_PRODUCT.name}
-            </h2>
-            <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              Escolha cor, tamanho e acabamento conforme as opções disponíveis neste produto.
-            </p>
-            <p className="text-base font-bold text-primary sm:text-lg">
-              {FAKE_OFFICIAL_PRODUCT.price}
-            </p>
-          </div>
-        </button>
-
-        <Link
-          to="/live"
-          className="group min-w-0 overflow-hidden rounded-none border-y border-border bg-card shadow-sm transition-shadow hover:shadow-lg sm:rounded-xl sm:border"
-        >
-          <div className="relative aspect-[0.82] w-full overflow-hidden bg-muted sm:aspect-square">
-            <img
-              src="/so-logo-bolsa.png"
-              alt="Bolsa artesanal Oxente"
-              className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-            <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-1 text-[10px] font-bold text-primary-foreground">
-              Achadinho
-            </span>
-          </div>
-          <div className="space-y-2 p-3 sm:p-4">
-            <h2 className="line-clamp-2 text-sm font-bold leading-tight text-card-foreground sm:text-base">
-              Bolsa Oxente para levar tudo com estilo
-            </h2>
-            <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              Prática, bonita e pronta para acompanhar sua rotina, com espaço para tudo que você
-              precisa carregar.
-            </p>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-base font-bold text-primary sm:text-lg">R$ 79,90</span>
-              <span className="flex items-center gap-1 text-[10px] text-muted-foreground sm:text-xs">
-                <Star className="h-3 w-3 fill-brand-gold text-brand-gold" /> 4,8
-              </span>
-            </div>
-            <span className="block text-[10px] text-muted-foreground sm:text-xs">860 vendidos</span>
-          </div>
-        </Link>
       </section>
     </div>
   );

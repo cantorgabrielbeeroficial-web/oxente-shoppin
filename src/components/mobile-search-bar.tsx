@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Search, ShoppingCart, Camera, MessageCircle } from "lucide-react";
+import { Search, ShoppingCart, MessageCircle } from "lucide-react";
 import { cartCount } from "@/lib/shop.functions";
 import { useAuthUser } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 
-/** Search bar + cart/chat shortcuts, made to float over the home banner on mobile. */
+/** Search bar and shopping shortcuts for the mobile home header. */
 export function MobileSearchBar({ className }: { className?: string }) {
   const [term, setTerm] = useState("");
   const navigate = useNavigate();
@@ -28,21 +28,14 @@ export function MobileSearchBar({ className }: { className?: string }) {
         }}
       >
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
           <input
             value={term}
             onChange={(event) => setTerm(event.target.value)}
             placeholder="Buscar na Oxente"
             aria-label="Buscar produtos"
-            className="h-10 w-full rounded-full border border-white/40 bg-white/10 pl-9 pr-10 text-sm text-white shadow-sm outline-none placeholder:text-white/80 focus-visible:ring-2 focus-visible:ring-white/40"
+            className="h-10 w-full rounded-md border border-white bg-white pl-10 pr-4 text-sm text-foreground shadow-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-white/60"
           />
-          <button
-            type="button"
-            aria-label="Buscar por foto"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-white"
-          >
-            <Camera className="h-4 w-4" />
-          </button>
         </div>
       </form>
 

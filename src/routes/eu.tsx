@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import {
   Package,
   ShoppingCart,
@@ -12,17 +13,41 @@ import {
   ImagePlus,
   Loader2,
   Megaphone,
+  Wallet,
+  Truck,
+  Star,
+  ChevronRight,
+  HelpCircle,
+  Info,
+  Bell,
+  type LucideIcon,
 } from "lucide-react";
 import { useAuthUser } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { listProducts } from "@/lib/catalog.functions";
+import { cartCount } from "@/lib/shop.functions";
+import { ProductGrid } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 
-const SHORTCUTS = [
-  { to: "/pedidos", label: "Meus pedidos", icon: Package },
-  { to: "/carrinho", label: "Meu carrinho", icon: ShoppingCart },
+const ORDER_STEPS: { label: string; icon: LucideIcon }[] = [
+  { label: "A pagar", icon: Wallet },
+  { label: "Preparando", icon: Package },
+  { label: "A caminho", icon: Truck },
+  { label: "Avaliar", icon: Star },
+];
+
+const ACTIVITIES: { to: string; label: string; icon: LucideIcon }[] = [
+  { to: "/filiacao", label: "Afiliados e criadores", icon: Megaphone },
   { to: "/vender", label: "Minha loja", icon: Store },
   { to: "/conversas", label: "Conversas", icon: MessageCircle },
-] as const;
+  { to: "/carrinho", label: "Meu carrinho", icon: ShoppingCart },
+];
+
+const SUPPORT: { to: string; label: string; icon: LucideIcon }[] = [
+  { to: "/vender", label: "Venda na Oxente", icon: Store },
+  { to: "/conversas", label: "Central de ajuda", icon: HelpCircle },
+  { to: "/", label: "Sobre a Oxente", icon: Info },
+];
 
 function prepareAvatar(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -85,6 +110,16 @@ function EuPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const avatarInput = useRef<HTMLInputElement>(null);
+
+  const { data: count = 0 } = useQuery({
+    queryKey: ["cart-count", user?.id],
+    queryFn: () => cartCount(),
+    enabled: Boolean(user),
+  });
+  const { data: suggestions = [] } = useQuery({
+    queryKey: ["eu-suggestions"],
+    queryFn: () => listProducts({ data: { limit: 8 } }),
+  });
 
   useEffect(() => {
     if (!user) {
@@ -158,108 +193,202 @@ function EuPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-5 pb-24 md:pb-8">
-      <div className="flex items-center gap-3 rounded-2xl bg-[#fff1ed] p-4 text-[#8f321f]">
-        <button
-          type="button"
-          className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#ffe9e3] text-[#b8442d] text-lg font-bold"
-          aria-label="Alterar foto de perfil"
-          disabled={!user || uploading}
-          onClick={() => avatarInput.current?.click()}
-        >
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="Foto de perfil" className="h-full w-full object-cover" />
-          ) : (
-            (user?.email?.[0]?.toUpperCase() ?? "O")
-          )}
+    <div className="mx-auto min-h-screen max-w-2xl bg-muted/40 pb-24 md:pb-8">
+      <div className="bg-primary px-4 pb-4 pt-5 text-primary-foreground">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-primary-foreground/60 bg-primary-foreground/20 text-lg font-bold"
+            aria-label="Alterar foto de perfil"
+            disabled={!user || uploading}
+            onClick={() => avatarInput.current?.click()}
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Foto de perfil" className="h-full w-full object-cover" />
+            ) : (
+              (user?.email?.[0]?.toUpperCase() ?? "O")
+            )}
+            {user && (
+              <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition-opacity hover:opacity-100">
+                {uploading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <ImagePlus className="h-5 w-5" />
+                )}
+              </span>
+            )}
+          </button>
+          <input
+            ref={avatarInput}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => handleAvatarUpload(event.target.files?.[0])}
+          />
           {user && (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition-opacity hover:opacity-100">
-              {uploading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <ImagePlus className="h-5 w-5" />
-              )}
+            <span className="sr-only">
+              A foto será ajustada automaticamente para o formato quadrado.
             </span>
           )}
-        </button>
-        <input
-          ref={avatarInput}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => handleAvatarUpload(event.target.files?.[0])}
-        />
-        {user && (
-          <span className="sr-only">
-            A foto será ajustada automaticamente para o formato quadrado.
-          </span>
-        )}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold">
-            {loading ? "Carregando..." : user ? user.email : "Oxente, entra aí!"}
-          </p>
-          <p className="text-xs opacity-80">
-            {user
-              ? "Bem-vindo de volta, meu painho/minha fia."
-              : "Faça login pra ver pedidos e moedas."}
-          </p>
-        </div>
-      </div>
-
-      {!user && !loading && (
-        <Link
-          to="/entrar"
-          className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground"
-        >
-          <LogIn className="h-4 w-4" /> Entrar na Oxente
-        </Link>
-      )}
-
-      <Link
-        to="/filiacao"
-        className="mt-4 flex items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4 text-orange-800 transition-colors hover:bg-orange-100"
-      >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white">
-          <Megaphone className="h-5 w-5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-bold">Quero ser afiliado</span>
-          <span className="mt-0.5 block text-xs text-orange-700/80">
-            Comece como pessoa física ou empresa e divulgue na sua rede.
-          </span>
-        </span>
-      </Link>
-
-      <div className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-        <Coins className="h-6 w-6 text-brand-gold" />
-        <div>
-          <p className="text-sm font-bold text-card-foreground">Moedas da Oxente</p>
-          <p className="text-xs text-muted-foreground">Junte cashback e troque em descontos.</p>
-        </div>
-      </div>
-
-      <ul className="mt-4 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-        {SHORTCUTS.map((item) => (
-          <li key={item.to}>
-            <Link to={item.to} className="flex items-center gap-3 p-4 text-sm text-card-foreground">
-              <item.icon className="h-5 w-5 text-primary" />
-              {item.label}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-base font-bold">
+              {loading ? "Carregando..." : user ? user.email : "Oxente, entra aí!"}
+            </p>
+            <p className="text-xs opacity-90">
+              {user
+                ? "Bem-vindo de volta, meu painho/minha fia."
+                : "Faça login pra ver pedidos e moedas."}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <Link
+              to="/notificacoes"
+              aria-label="Notificações"
+              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-primary-foreground/15"
+            >
+              <Bell className="h-5 w-5" />
             </Link>
-          </li>
-        ))}
-      </ul>
+            <Link
+              to="/carrinho"
+              aria-label="Carrinho"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full hover:bg-primary-foreground/15"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {count > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 rounded-full bg-white px-1.5 text-[10px] font-bold text-primary">
+                  {count}
+                </span>
+              )}
+            </Link>
+            <Link
+              to="/conversas"
+              aria-label="Conversas"
+              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-primary-foreground/15"
+            >
+              <MessageCircle className="h-5 w-5" />
+            </Link>
+          </div>
+        </div>
 
-      {user && (
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-4 w-full text-destructive hover:text-destructive"
-          onClick={handleSignOut}
+        <Link
+          to="/filiacao"
+          className="mt-3 flex items-center gap-2 rounded-lg bg-[#fff6d6] px-3 py-2 text-xs font-semibold text-[#7a4a00]"
         >
-          <LogOut className="mr-2 h-4 w-4" />
-          Sair da conta
-        </Button>
-      )}
+          <Megaphone className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">
+            Quero ser afiliado: divulgue na sua rede e ganhe comissão, visse?
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0" />
+        </Link>
+      </div>
+
+      <div className="space-y-2 px-2 pt-2">
+        {!user && !loading && (
+          <Link
+            to="/entrar"
+            className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground"
+          >
+            <LogIn className="h-4 w-4" /> Entrar na Oxente
+          </Link>
+        )}
+
+        <section className="rounded-xl bg-card p-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-card-foreground">Minhas compras</h2>
+            <Link to="/pedidos" className="flex items-center text-xs text-muted-foreground">
+              Ver histórico <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-1 text-center">
+            {ORDER_STEPS.map((step) => (
+              <Link
+                key={step.label}
+                to="/pedidos"
+                className="flex flex-col items-center gap-1.5 text-[11px] text-card-foreground"
+              >
+                <step.icon className="h-6 w-6 text-primary" strokeWidth={1.6} />
+                {step.label}
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl bg-card p-3">
+          <h2 className="text-sm font-bold text-card-foreground">Minha carteira</h2>
+          <Link to="/" className="mt-3 flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-gold/20 text-brand-gold">
+              <Coins className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-card-foreground">
+                Moedas da Oxente
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Junte cashback e troque em descontos.
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+        </section>
+
+        <section className="rounded-xl bg-card p-3">
+          <h2 className="text-sm font-bold text-card-foreground">Mais atividades</h2>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {ACTIVITIES.map((item) => (
+              <Link
+                key={item.label}
+                to={item.to}
+                className="flex items-center gap-2 rounded-md border border-border p-3 text-sm font-medium text-card-foreground"
+              >
+                <item.icon className="h-5 w-5 shrink-0 text-primary" />
+                <span className="min-w-0 flex-1 leading-tight">{item.label}</span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl bg-card px-3 py-1">
+          <h2 className="pb-1 pt-2 text-sm font-bold text-card-foreground">Suporte Oxente</h2>
+          <ul className="divide-y divide-border">
+            {SUPPORT.map((item) => (
+              <li key={item.label}>
+                <Link
+                  to={item.to}
+                  className="flex items-center gap-3 py-3 text-sm text-card-foreground"
+                >
+                  <item.icon className="h-5 w-5 text-muted-foreground" />
+                  <span className="flex-1">{item.label}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {user && (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full bg-card text-destructive hover:text-destructive"
+            onClick={handleSignOut}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sair da conta
+          </Button>
+        )}
+
+        {suggestions.length > 0 && (
+          <section className="pb-2 pt-3">
+            <h2 className="mb-3 flex items-center gap-3 text-center text-sm font-bold text-foreground">
+              <span className="h-px flex-1 bg-border" />
+              Você também pode gostar
+              <span className="h-px flex-1 bg-border" />
+            </h2>
+            <ProductGrid products={suggestions} />
+          </section>
+        )}
+      </div>
     </div>
   );
 }

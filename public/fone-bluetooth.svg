@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="Fone de ouvido Bluetooth">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="70%">
+      <stop offset="0" stop-color="#fff3e6"/>
+      <stop offset="1" stop-color="#ffd2a8"/>
+    </radialGradient>
+    <linearGradient id="cup" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3a3a3f"/>
+      <stop offset="1" stop-color="#0f0f12"/>
+    </linearGradient>
+    <linearGradient id="band" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a4a50"/>
+      <stop offset="1" stop-color="#1c1c20"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="600" fill="url(#bg)"/>
+  <ellipse cx="300" cy="520" rx="190" ry="22" fill="#000" opacity=".16"/>
+  <path d="M110 330 C110 150 200 70 300 70 C400 70 490 150 490 330" fill="none" stroke="url(#band)" stroke-width="34" stroke-linecap="round"/>
+  <path d="M135 300 C140 175 210 105 300 105 C390 105 460 175 465 300" fill="none" stroke="#f26a1b" stroke-width="8" stroke-linecap="round" opacity=".9"/>
+  <rect x="62" y="290" width="104" height="190" rx="48" fill="url(#cup)"/>
+  <rect x="434" y="290" width="104" height="190" rx="48" fill="url(#cup)"/>
+  <rect x="82" y="322" width="64" height="126" rx="32" fill="#1b1b1f" stroke="#f26a1b" stroke-width="5"/>
+  <rect x="454" y="322" width="64" height="126" rx="32" fill="#1b1b1f" stroke="#f26a1b" stroke-width="5"/>
+  <circle cx="114" cy="385" r="14" fill="#f26a1b"/>
+  <circle cx="486" cy="385" r="14" fill="#f26a1b"/>
+  <path d="M96 300 C96 290 110 284 124 284" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".25"/>
+</svg>

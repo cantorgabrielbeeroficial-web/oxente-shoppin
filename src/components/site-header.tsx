@@ -30,7 +30,12 @@ export function SiteHeader() {
   const navigate = useNavigate();
   const { user, loading } = useAuthUser();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const isHome = pathname === "/";
+  const hideOnMobile =
+    pathname === "/" ||
+    pathname === "/oficiais" ||
+    pathname === "/notificacoes" ||
+    pathname === "/eu" ||
+    pathname.startsWith("/produto/");
 
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
@@ -47,7 +52,7 @@ export function SiteHeader() {
 
   return (
     <header
-      className={`sticky top-0 z-50 bg-white text-primary shadow-md ${isHome ? "hidden sm:block" : ""}`}
+      className={`sticky top-0 z-50 bg-white text-primary shadow-md ${hideOnMobile ? "hidden sm:block" : ""}`}
     >
       <div className="mx-auto flex max-w-7xl flex-nowrap items-center gap-2 px-3 py-2 text-primary sm:flex-wrap sm:gap-3 sm:px-4 sm:py-3">
         <Link to="/" className="hidden shrink-0 items-center sm:flex">

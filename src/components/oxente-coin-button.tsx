@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import coinIcon from "@/assets/oxente-coin.png";
+
+// Aponta diretamente para a imagem na pasta public
+const coinIcon = "/oxente-coin.png";
 
 export function OxenteCoinButton() {
   const [open, setOpen] = useState(false);

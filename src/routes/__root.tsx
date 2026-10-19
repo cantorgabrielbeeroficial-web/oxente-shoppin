@@ -8,7 +8,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -131,7 +131,9 @@ function RootComponent() {
   const router = useRouter();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const isLiveRoute = pathname === "/live";
+  const isProductRoute = pathname.startsWith("/produto/");
   const [showSplash, setShowSplash] = useState(true);
+  const handleSplashComplete = useCallback(() => setShowSplash(false), []);
 
   useEffect(() => {
     if (!hasSupabaseConfig()) return;
@@ -146,7 +148,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} duration={400} />}
+      {showSplash && <SplashScreen onComplete={handleSplashComplete} duration={400} />}
       <div className="flex min-h-screen flex-col bg-background">
         {!isLiveRoute && <SiteHeader />}
         <main className={isLiveRoute ? "flex-1 min-h-0 overflow-hidden" : "flex-1"}>
@@ -154,9 +156,9 @@ function RootComponent() {
           <Outlet />
         </main>
         {!isLiveRoute && <SiteFooter />}
-        {!isLiveRoute && <div className="h-14 md:hidden" />}
+        {!isLiveRoute && !isProductRoute && <div className="h-14 md:hidden" />}
       </div>
-      {!isLiveRoute && <BottomNav />}
+      {!isLiveRoute && !isProductRoute && <BottomNav />}
       <div className="hidden md:block">
         <OxenteCoinButton />
         <MariaBonitaChat />
